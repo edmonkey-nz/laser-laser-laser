@@ -43,4 +43,6 @@ listed in `requirements.txt` and fetched by pip at install time.
 ## Fonts / assets
 
 The UI uses the browser's built-in monospace fonts (no bundled fonts).
-The app icon (`icon.png`) is the project's own artwork.
+
+The app icon (`icon.png`, also used as the favicon): Sine icon created by
+Grand Iconic — Flaticon (https://www.flaticon.com/).

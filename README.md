@@ -25,7 +25,7 @@ terminated, and test everything in `--preview` first.
 
 ## Files
 
-- `lasersynth.py` — main app (render loop, MIDI, audio, preview)
+- `laserx3.py` — main app (render loop, MIDI, audio, preview)
 - `webui.py` + `static/index.html` — browser control surface
 - `patterns.py` + `patterns.json` — pattern bank storage (a few starter
   patterns included)
@@ -69,7 +69,7 @@ g++ -O2 -fPIC -shared -std=c++14 -o libHeliosDacAPI.so \
     HeliosDacAPI.cpp ../HeliosDac.cpp \
     ../idn/idn.cpp ../idn/idnServerList.cpp ../idn/plt-posix.cpp \
     $(pkg-config --cflags --libs libusb-1.0) -I.. -lpthread
-cp libHeliosDacAPI.so /path/to/lasersynth/
+cp libHeliosDacAPI.so /path/to/laserx3/
 ```
 
 (Bonus: this build includes the SDK's IDN network-DAC support, so the
@@ -84,12 +84,12 @@ Drop `HeliosLaserDAC.dll` and `libusb-1.0.dll` from the SDK repo
 ## Running
 
 ```bash
-python3 lasersynth.py --preview             # screen only — start here
-python3 lasersynth.py --web                 # browser UI at localhost:8080
-python3 lasersynth.py --laser --web         # laser + browser control
-python3 lasersynth.py --laser --preview     # laser + pygame mirror
-python3 lasersynth.py --list-midi           # find your controller
-python3 lasersynth.py --laser --midi "MPK"  # match MIDI port by substring
+python3 laserx3.py --preview             # screen only — start here
+python3 laserx3.py --web                 # browser UI, then open http://laserx3:8080/
+python3 laserx3.py --laser --web         # laser + browser control
+python3 laserx3.py --laser --preview     # laser + pygame mirror
+python3 laserx3.py --list-midi           # find your controller
+python3 laserx3.py --laser --midi "MPK"  # match MIDI port by substring
 ```
 
 Modes combine freely (`--laser --web --preview` all at once is fine).
@@ -114,6 +114,12 @@ control surface — `http://<machine-ip>:8080`. MIDI, keyboard and
 browser stay in sync (state echoes to the page at 5 Hz); frames stream
 as compact binary over a WebSocket at 30 Hz. No auth — it's for your
 LAN, not the internet.
+
+The startup message prints `http://laserx3:8080/`. That friendly name
+resolves if you set the machine's hostname to `laserx3` (`hostnamectl
+set-hostname laserx3`) or add it to `/etc/hosts`; otherwise just use
+`http://localhost:8080/` on the same machine, or the machine's IP from
+elsewhere on the LAN.
 
 **MIDI port selection**: on launch the synth auto-connects to the
 first *real* controller — ALSA's ever-present "Midi Through" loopback
@@ -179,7 +185,7 @@ everything for one-off sessions.
 | 45 | size Y | | | |
 | 46 | size link (≥64 on) | | | |
 
-Remap by editing `CC_MAP` at the top of `lasersynth.py`.
+Remap by editing `CC_MAP` at the top of `laserx3.py`.
 
 **Keyboard** (preview window): `1–6` shapes, `←/→` ratio A, `↑/↓` ratio B,
 `[`/`]` size, `m` morph, `s` spin, `h` hue, `a` audio amount, `d`/`D`
@@ -432,7 +438,7 @@ timers needed when the laser is running.
 
 ## Version
 
-Current release: **1.0.0** (see `CHANGELOG.md`). Run `python lasersynth.py
+Current release: **1.0.0** (see `CHANGELOG.md`). Run `python laserx3.py
 --version` to check the installed version.
 
 ## License

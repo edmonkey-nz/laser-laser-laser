@@ -1,5 +1,5 @@
 """
-webui.py — browser control surface for lasersynth.
+webui.py — browser control surface for laserx3.
 
 Runs an aiohttp server in a background thread:
   GET /    → static/index.html (single file, vanilla JS, works offline)
@@ -163,7 +163,7 @@ class WebUI:
                                      else 0,
                         },
                         "cc_map": {k: c for c, (k, _l, _h) in
-                                   __import__("lasersynth").build_cc_map(
+                                   __import__("laserx3").build_cc_map(
                                        self.settings.custom_cc).items()},
                         "cc_custom": dict(self.settings.custom_cc),
                         "cc_mode": dict(self.settings.cc_mode),
@@ -251,8 +251,8 @@ class WebUI:
         self._loop.run_until_complete(runner.setup())
         site = web.TCPSite(runner, self.host, self.port)
         self._loop.run_until_complete(site.start())
-        print(f"[web] control surface at http://localhost:{self.port} "
-              f"(reachable on your LAN too)")
+        print(f"[web] control surface at http://laserx3:{self.port} "
+              f"(or http://localhost:{self.port}; reachable on your LAN too)")
         self._loop.run_forever()
 
     def _apply(self, msg):
@@ -302,7 +302,7 @@ class WebUI:
                     self.settings.set("midi_port", name)
         elif t == "midi_learn_cc":
             param = msg.get("param", "")
-            import lasersynth as _ls
+            import laserx3 as _ls
             valid = param in p or param in _ls.ACTION_KEYS
             self.settings.learn_param = None \
                 if self.settings.learn_param == param \
