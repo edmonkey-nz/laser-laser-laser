@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Runtime state — these are created/overwritten as you use the app.
+# patterns.json ships with starter patterns; uncomment to keep yours local:
+# patterns.json
+settings.json
+settings.json.tmp
+patterns.json.tmp
+
+# User-uploaded ILDA files (keep the sample, ignore the rest)
+ilda/*.ild
+!ilda/spinning_star.ild
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Build artifacts (PyInstaller / AppImage etc.)
+build/
+dist/
+*.spec

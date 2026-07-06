@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Laser! Laser Laser!</title>
+<link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAEwUlEQVR4nLXXXYhdVxUH8N86dz7uZDJDUknFmkYrFh8KSo1PVjH64ge+FQMxQQyUPpYUwUZfmoB9KH0IqQ/SByuCQRmNEROFViGpVhFs9KGEorbQhLRCE8k4k3Hmzr3nLh/OueOdO3c+4uiCzT1373X+67/XWnvtdcIQSRnD5rcrIXJDhZSRsvH/MF7jNwY3N9L/p2ZYXpMTU4zPYtc2jfYw5mmFWBxcj5pZnCAOMzrK0+M8vMx0l9huLBIFOcbcMmeXeeJ+livjkT0CjRDl3+Spezn2Nkrma4Ibx21zCWSDqXtwldMfEsd6NiNlhMhrcmKBqxNML/GFcf60QDFJdzvWexgt9jf5xSJzk7xvn1hMGSs5MEszaM7RavK7+0RrmztfJX+VL8/RCpqzNLFIXxKWtauDWGYy5bKBEPQfozs4qoG8wmTXCsAKTtGvWaKDNt3aWPaMhsg/y12vyef+ID9Tz0eVSOuPHkabbqe20S+rCHTqMSiXaECLo/fwKB7v292WZRj+Gg8MMoQDlCmjzeHrdDq8p7Z+Rwk6DH+FwCza9ZjtU5ipjkte5KMFD96i0eHel+UUkVvNhfXwNw3BnpVi5dAYxVK1i3e1eTecIGZkY2YLJXwY/qpS3HNPD+lS/XhRNlt8aZ6yZG6C3S324vUDFJ8WnYpkVVOoPLeHuEyk7Fwagr8ugdn6twd8QX5yD/tu8NuC1yc5Os++Skd5Xn4zKEJ8K2UR5EGxKtwXZKxy9yCB2T5mo7Xbz8uPTPCBBb5aUHY50yUKjrb5YKXjgTGemsDP5JUQ5+Cc/OwYOxuUHV6apD1X3S05O4wAVYIE0aSckWNtfn83OwrcrNbP4aFFdLm/fufIWAUa+M7P5QttHtnFabgLb/DdL4pHfiobSadYj0CnIpC3aHyZ9llO/J0Hg6LF5YPinRl5Y77S3XtRjtzg0AKdNm/t5P23ebHgw7cqnZ8s0Cr5wS/l+G26ibH1CHRVNXLHfyrgM/3rKeNHXJ+rwHe9zed3s+8WrxR85TZ/bPBQswrpM0fE13vvXpC7O3QHz+yqHBjpe4Z6h0l1HEN0npPvTPCPYG+X492K+LnD4rXvy2/czbM3uXiE4++VI1PEecob5CD+0BD0ywHKwQsoxL+el2822d/l4zdZ6nCmXvv2D+VflnglRDdlwsdEfk8OLfNrkhBGhyjCj6vCVZZcK9kfZItfPSquTssG2T0kXqzpRgxUymH4W7qMenKlPp5t3ijptqvr9XkyqrXImZXGc20HvGElnLU2B9aTkjfHKW5yfZkX4GRdxwYL0Gb4Q2/DLkXtuqhb9UgZD5ApY5nfLHC9w7NfE4tP0kgrbf2q0cPoUgy7DVc8sESMIqsOdqHXTKzdPHj1U/K+l+pSfVJ0Tq7vsITTcmFZFZt2Xx+xQmCMpTZLo1VT+olT8nKXohhy5y8ROyg/JxvNTbrmHsYS+0cYbzM3xtIKgagT56BYfEqemeLYP/n1wiZt+Xy9trCR9UoCWTC1syJ/5rhYnOm15bWX4kniLkZnebrBwyXTeYct1wYMssFccnaaJx5juQKO4d3M43JimvH/hfGezNE6NeTTbEAyttLZ/LdSYa/e9Douzk2+o+9cei4fnP83l78jEjjYZjQAAAAASUVORK5CYII=">
+<style>
+  :root {
+    --bg: #0a0c11;
+    --panel: #11151d;
+    --panel-edge: #1c2230;
+    --ink: #c8d2e0;
+    --ink-dim: #5c6778;
+    --accent: #d8e6f2;
+    --track: #232b3a;
+    --danger: #ff4a3d;
+    font-size: 15px;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: ui-monospace, "Cascadia Mono", "JetBrains Mono", Menlo, monospace;
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+  }
+  header {
+    display: flex; align-items: baseline; gap: 1rem;
+    padding: .7rem 1.1rem;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+  header h1 { font-size: 1rem; font-weight: 600; letter-spacing: .12em; }
+  #title-icon { width: 32px; height: 32px; display: block; }
+  header { align-items: center; }
+  header h1 span { color: var(--ink-dim); }
+  #open-settings, .banner-btn {
+    font: inherit; font-size: .68rem; letter-spacing: .18em; cursor: pointer;
+    background: var(--track); color: var(--ink);
+    border: none; border-radius: 4px; padding: .35rem .7rem;
+  }
+  #blank.banner-btn { color: var(--danger); }
+  #blank.banner-btn.on { background: var(--danger); color: #fff; }
+  #open-settings:focus-visible { outline: 2px solid var(--accent); }
+  #settings-modal {
+    position: fixed; inset: 0; z-index: 20; display: flex;
+    align-items: center; justify-content: center;
+    background: rgba(4,6,10,.75);
+  }
+  #settings-modal[hidden], #about-modal[hidden] { display: none; }
+  #about-modal {
+    position: fixed; inset: 0; z-index: 20; display: flex;
+    align-items: center; justify-content: center;
+    background: rgba(4,6,10,.75);
+  }
+  .about-card { background: #000; border: 1px solid var(--panel-edge); }
+  .about-body { color: #b8b8b8; font-size: .82rem; line-height: 1.6;
+    white-space: normal; }
+  .about-body h1 { font-size: 1.2rem; color: #d8d8d8; margin: .3rem 0 .6rem; }
+  .about-body h2 { font-size: .95rem; color: #cfcfcf; margin: 1rem 0 .4rem;
+    letter-spacing: normal; text-transform: none; }
+  .about-body h3 { font-size: .85rem; color: #c4c4c4; margin: .8rem 0 .3rem; }
+  .about-body a { color: #8fb8d8; }
+  .about-body code { background: #1a1a1a; padding: .1rem .3rem; border-radius: 3px; }
+  .about-body ul { margin: .4rem 0 .4rem 1.2rem; }
+  .about-body p { margin: .5rem 0; }
+  .modal-card {
+    background: var(--panel); border: 1px solid var(--panel-edge);
+    border-radius: 8px; padding: 1rem 1.2rem; width: min(560px, 92vw);
+    max-height: 86vh; overflow-y: auto;
+  }
+  .modal-card h2 { font-size: .8rem; letter-spacing: .2em; color: var(--ink);
+                   text-transform: uppercase; }
+  .modal-head { display: flex; justify-content: space-between;
+                align-items: center; margin-bottom: .8rem; }
+  .modal-head button { font: inherit; cursor: pointer; background: var(--track);
+    color: var(--ink); border: none; border-radius: 4px; padding: .3rem .7rem; }
+  .set-row { display: grid; grid-template-columns: 9rem 1fr; gap: .6rem;
+             align-items: center; margin: .4rem 0; font-size: .8rem; }
+  .set-row input[type=number] {
+    font: inherit; font-size: .8rem; background: var(--track);
+    color: var(--ink); border: 1px solid transparent; border-radius: 4px;
+    padding: .3rem .5rem; width: 8rem;
+  }
+  .modal-card h3 { font-size: .68rem; letter-spacing: .2em;
+    color: var(--ink-dim); text-transform: uppercase; margin: 1rem 0 .4rem; }
+  .map-hint { font-size: .72rem; color: var(--ink-dim); margin-bottom: .5rem; }
+  #map-table { width: 100%; border-collapse: collapse; font-size: .78rem; }
+  #map-table td { padding: .28rem .3rem; border-top: 1px solid var(--panel-edge); }
+  #map-table td.cc { color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+  #map-table td.cc.custom { color: var(--accent); }
+  #map-table button { font: inherit; font-size: .7rem; cursor: pointer;
+    background: var(--track); color: var(--ink); border: none;
+    border-radius: 4px; padding: .25rem .5rem; }
+  #map-table button.learning { color: var(--accent); animation: pulse 1s infinite; }
+  .mode-sel { font: inherit; font-size: .68rem; background: var(--track);
+    color: var(--ink); border: none; border-radius: 4px; padding: .2rem .3rem; }
+  .geom-wrap { display: flex; justify-content: center; margin: .5rem 0; }
+  #geom-canvas { background: #000; border: 1px solid var(--panel-edge);
+    border-radius: 4px; touch-action: none; cursor: grab; }
+  #status { margin-left: auto; color: var(--ink-dim); font-size: .78rem; letter-spacing: .05em; margin-right: .6rem; }
+  .mdot { display: inline-block; width: .55em; height: .55em;
+          border-radius: 50%; background: var(--track);
+          margin-right: .45em; vertical-align: baseline;
+          transition: background 120ms; }
+  .mdot.on { background: #4ade80; box-shadow: 0 0 6px #4ade80; }
+  #midi-act { font-size: .78rem; color: var(--ink-dim); }
+  #midi-port { font: inherit; font-size: .78rem; background: var(--track);
+    color: var(--ink); border: 1px solid transparent; border-radius: 4px;
+    padding: .3rem .5rem; width: 100%; }
+  #status b { color: var(--ink); font-weight: 500; }
+
+  main {
+    flex: 1; display: grid; gap: 1rem; padding: 1rem;
+    grid-template-columns: 250px minmax(280px, 1fr) auto;
+    align-items: start; max-width: 1560px; margin: 0 auto; width: 100%;
+  }
+  #stage { min-width: 0; }
+  #scope-wrap { max-width: min(100%, 479px); margin: 0 auto; }
+  #controls {
+    display: grid; grid-template-columns: repeat(3, minmax(200px, 232px));
+    gap: .8rem; align-items: start;
+  }
+  @media (max-width: 1350px) {
+    #controls { grid-template-columns: repeat(2, minmax(200px, 1fr)); }
+  }
+  @media (max-width: 1150px) {
+    main { grid-template-columns: 1fr 300px; }
+    #controls { grid-template-columns: 1fr; }
+    #bank { grid-column: 1 / -1; order: 3; }
+    #pat-list { max-height: 200px; }
+  }
+  @media (max-width: 760px) {
+    main { grid-template-columns: 1fr; }
+    #controls { grid-template-columns: 1fr; }
+  }
+
+  /* ---- pattern bank (left column, vertical) ---- */
+  #bank { min-width: 0; }
+  .bank-head { display: flex; flex-direction: column; gap: .5rem; }
+  .bank-row { display: flex; gap: .4rem; }
+  .bank-row input { min-width: 0; }
+  #trans { flex-wrap: wrap; }
+  #trans button { flex: 1 1 auto; }
+  .bank-random { width: 100%; margin-top: .5rem; font: inherit; font-size: .72rem;
+    letter-spacing: .06em; cursor: pointer; background: var(--track); color: var(--ink);
+    border: none; border-radius: 4px; padding: .5rem; }
+  .bank-random:hover { background: var(--accent); color: #0a0c11; }
+  #pat-list { flex-direction: column; overflow-y: auto;
+              max-height: calc(100vh - 320px); }
+  .chip { width: 100%; }
+  .chip .load { flex: 1; text-align: left; min-width: 0;
+                overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bank-row input {
+    flex: 1; font: inherit; font-size: .8rem;
+    background: var(--track); color: var(--ink);
+    border: 1px solid transparent; border-radius: 4px; padding: .45rem .6rem;
+  }
+  .bank-row input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .bank-row button {
+    font: inherit; font-size: .78rem; letter-spacing: .08em; cursor: pointer;
+    background: var(--accent); color: #0a0c11; font-weight: 600;
+    border: none; border-radius: 4px; padding: .45rem .9rem;
+  }
+  #trans { align-items: center; }
+  .trans-label { font-size: .65rem; color: var(--ink-dim); letter-spacing: .18em;
+                 text-transform: uppercase; margin-right: .2rem; }
+  #trans button { flex: 0 0 auto; }
+  .chip .midi { color: var(--ink-dim); border-left: 1px solid var(--panel-edge); }
+  .chip .midi.bound { color: var(--ink); }
+  .chip .midi.learning { color: var(--accent); animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  @media (prefers-reduced-motion: reduce) { .chip .midi.learning { animation: none; } }
+  .aud-routes { display: flex; flex-direction: column; gap: .25rem; margin-top: .5rem; }
+  .aud-routes label { display: grid; grid-template-columns: 3rem 1fr; gap: .4rem;
+    align-items: center; font-size: .7rem; color: var(--ink-dim); }
+  .aud-routes select { font: inherit; font-size: .7rem; background: var(--track);
+    color: var(--ink); border: 1px solid transparent; border-radius: 4px; padding: .25rem .3rem; }
+  .aud-routes select:focus-visible { outline: 2px solid var(--accent); }
+  .scope-modes { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .5rem; }
+  .scope-modes button { flex: 1 1 30%; font: inherit; font-size: .66rem;
+    letter-spacing: .03em; cursor: pointer; background: var(--track);
+    color: var(--ink); border: none; border-radius: 4px; padding: .35rem .2rem; }
+  .scope-modes button.active { background: var(--accent); color: #0a0c11; font-weight: 600; }
+  .scope-modes .hint { flex: 1 1 100%; color: var(--ink-dim); font-size: .66rem; }
+  .ilda-row { display: flex; gap: .4rem; margin-bottom: .3rem; }
+  .osc-row { display: flex; gap: .4rem; margin-bottom: .4rem; }
+  .osc-row select { flex: 1; min-width: 0; font: inherit; font-size: .72rem;
+    background: var(--track); color: var(--ink); border: 1px solid transparent;
+    border-radius: 4px; padding: .35rem .4rem; }
+  .osc-row select:focus-visible { outline: 2px solid var(--accent); }
+  .ilda-row select {
+    flex: 1; min-width: 0; font: inherit; font-size: .78rem;
+    background: var(--track); color: var(--ink);
+    border: 1px solid transparent; border-radius: 4px; padding: .4rem .5rem;
+  }
+  .ilda-row select:focus-visible { outline: 2px solid var(--accent); }
+  .ilda-row button {
+    font: inherit; font-size: .72rem; letter-spacing: .06em; cursor: pointer;
+    background: var(--track); color: var(--ink);
+    border: none; border-radius: 4px; padding: .4rem .6rem;
+  }
+  .ilda-status { font-size: .7rem; color: var(--ink-dim); min-height: 1em; }
+  .ilda-status.err { color: var(--danger); }
+  body.dragging::after {
+    content: "drop a .ild or an image";
+    position: fixed; inset: 0; display: flex; align-items: center;
+    justify-content: center; background: rgba(10,12,17,.85);
+    color: var(--accent); letter-spacing: .2em; font-size: .9rem;
+    pointer-events: none; z-index: 10;
+  }
+  #pat-list { margin-top: .6rem; display: flex; flex-wrap: wrap; gap: .4rem; }
+  #pat-list .hint { color: var(--ink-dim); font-size: .75rem; }
+  .chip { display: flex; }
+  .chip button {
+    font: inherit; font-size: .75rem; cursor: pointer; border: none;
+    background: var(--track); color: var(--ink); padding: .4rem .6rem;
+  }
+  .chip .load { border-radius: 4px 0 0 4px; }
+  .chip .del {
+    border-radius: 0 4px 4px 0; color: var(--ink-dim);
+    border-left: 1px solid var(--panel-edge); padding: .4rem .5rem;
+  }
+  .chip .del:hover { color: var(--danger); }
+  .chip button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  /* ---- beam ---- */
+  #scope-wrap { position: relative; }
+  canvas#scope {
+    width: 100%; aspect-ratio: 1/1; display: block;
+    background: #000;
+    border: 1px solid var(--panel-edge);
+    border-radius: 6px;
+  }
+  #blank-veil {
+    position: absolute; inset: 0; display: none;
+    align-items: center; justify-content: center;
+    color: var(--danger); letter-spacing: .3em; font-size: .85rem;
+  }
+  #scope-wrap.blanked #blank-veil { display: flex; }
+  #scope-wrap.blanked canvas { opacity: .35; }
+
+  /* ---- controls ---- */
+  .panel {
+    background: var(--panel); border: 1px solid var(--panel-edge);
+    border-radius: 6px; padding: .7rem .85rem .8rem; margin-bottom: .8rem;
+  }
+  .panel h2 {
+    font-size: .68rem; font-weight: 600; letter-spacing: .22em;
+    color: var(--ink-dim); text-transform: uppercase; margin-bottom: .7rem;
+  }
+  .shapes, .toggles { display: flex; flex-wrap: wrap; gap: .4rem; }
+  .toggles { margin-top: .55rem; }
+  .shapes button, .toggles button {
+    flex: 1 1 30%;
+    background: var(--track); color: var(--ink);
+    border: 1px solid transparent; border-radius: 4px;
+    padding: .5rem .3rem; font: inherit; font-size: .78rem;
+    cursor: pointer; letter-spacing: .04em;
+  }
+  .shapes button.active, .toggles button.active { background: var(--accent); color: #0a0c11; font-weight: 600; }
+  .shapes button:focus-visible, .toggles button:focus-visible,
+  #blank:focus-visible,
+  input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .fader { display: grid; grid-template-columns: 4.8rem 1fr 2.6rem; gap: .4rem; align-items: center; margin: .28rem 0; }
+  .fader label { font-size: .72rem; }
+  .fader output { font-size: .68rem; }
+  .fader label { font-size: .78rem; color: var(--ink); }
+  .fader output { font-size: .75rem; color: var(--ink-dim); text-align: right; font-variant-numeric: tabular-nums; }
+  input[type=range] {
+    -webkit-appearance: none; appearance: none; width: 100%; height: 22px;
+    background: transparent; cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-runnable-track { height: 4px; background: var(--track); border-radius: 2px; }
+  input[type=range]::-moz-range-track { height: 4px; background: var(--track); border-radius: 2px; }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 10px; height: 20px; margin-top: -8px;
+    background: var(--accent); border-radius: 2px;
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 10px; height: 20px; background: var(--accent); border: none; border-radius: 2px;
+  }
+
+  /* ---- audio meters ---- */
+  .meters { display: flex; gap: .8rem; height: 56px; margin-top: .3rem; }
+  .meter { flex: 1; display: flex; flex-direction: column; align-items: center; gap: .3rem; }
+  .meter .bar { width: 100%; flex: 1; background: var(--track); border-radius: 3px; position: relative; overflow: hidden; }
+  .meter .bar i { position: absolute; left: 0; right: 0; bottom: 0; height: 0%; background: var(--ink); border-radius: 3px; transition: height 60ms linear; }
+  .meter span { font-size: .65rem; color: var(--ink-dim); letter-spacing: .15em; }
+
+
+
+  #conn { position: fixed; inset: auto 1rem 1rem auto; font-size: .72rem;
+          color: var(--ink-dim); }
+  #conn.lost { color: var(--danger); }
+  @media (prefers-reduced-motion: reduce) { .meter .bar i { transition: none; } }
+</style>
+</head>
+<body>
+<header>
+  <img id="title-icon" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAEwUlEQVR4nLXXXYhdVxUH8N86dz7uZDJDUknFmkYrFh8KSo1PVjH64ge+FQMxQQyUPpYUwUZfmoB9KH0IqQ/SByuCQRmNEROFViGpVhFs9KGEorbQhLRCE8k4k3Hmzr3nLh/OueOdO3c+4uiCzT1373X+67/XWnvtdcIQSRnD5rcrIXJDhZSRsvH/MF7jNwY3N9L/p2ZYXpMTU4zPYtc2jfYw5mmFWBxcj5pZnCAOMzrK0+M8vMx0l9huLBIFOcbcMmeXeeJ+livjkT0CjRDl3+Spezn2Nkrma4Ibx21zCWSDqXtwldMfEsd6NiNlhMhrcmKBqxNML/GFcf60QDFJdzvWexgt9jf5xSJzk7xvn1hMGSs5MEszaM7RavK7+0RrmztfJX+VL8/RCpqzNLFIXxKWtauDWGYy5bKBEPQfozs4qoG8wmTXCsAKTtGvWaKDNt3aWPaMhsg/y12vyef+ID9Tz0eVSOuPHkabbqe20S+rCHTqMSiXaECLo/fwKB7v292WZRj+Gg8MMoQDlCmjzeHrdDq8p7Z+Rwk6DH+FwCza9ZjtU5ipjkte5KMFD96i0eHel+UUkVvNhfXwNw3BnpVi5dAYxVK1i3e1eTecIGZkY2YLJXwY/qpS3HNPD+lS/XhRNlt8aZ6yZG6C3S324vUDFJ8WnYpkVVOoPLeHuEyk7Fwagr8ugdn6twd8QX5yD/tu8NuC1yc5Os++Skd5Xn4zKEJ8K2UR5EGxKtwXZKxy9yCB2T5mo7Xbz8uPTPCBBb5aUHY50yUKjrb5YKXjgTGemsDP5JUQ5+Cc/OwYOxuUHV6apD1X3S05O4wAVYIE0aSckWNtfn83OwrcrNbP4aFFdLm/fufIWAUa+M7P5QttHtnFabgLb/DdL4pHfiobSadYj0CnIpC3aHyZ9llO/J0Hg6LF5YPinRl5Y77S3XtRjtzg0AKdNm/t5P23ebHgw7cqnZ8s0Cr5wS/l+G26ibH1CHRVNXLHfyrgM/3rKeNHXJ+rwHe9zed3s+8WrxR85TZ/bPBQswrpM0fE13vvXpC7O3QHz+yqHBjpe4Z6h0l1HEN0npPvTPCPYG+X492K+LnD4rXvy2/czbM3uXiE4++VI1PEecob5CD+0BD0ywHKwQsoxL+el2822d/l4zdZ6nCmXvv2D+VflnglRDdlwsdEfk8OLfNrkhBGhyjCj6vCVZZcK9kfZItfPSquTssG2T0kXqzpRgxUymH4W7qMenKlPp5t3ijptqvr9XkyqrXImZXGc20HvGElnLU2B9aTkjfHKW5yfZkX4GRdxwYL0Gb4Q2/DLkXtuqhb9UgZD5ApY5nfLHC9w7NfE4tP0kgrbf2q0cPoUgy7DVc8sESMIqsOdqHXTKzdPHj1U/K+l+pSfVJ0Tq7vsITTcmFZFZt2Xx+xQmCMpTZLo1VT+olT8nKXohhy5y8ROyg/JxvNTbrmHsYS+0cYbzM3xtIKgagT56BYfEqemeLYP/n1wiZt+Xy9trCR9UoCWTC1syJ/5rhYnOm15bWX4kniLkZnebrBwyXTeYct1wYMssFccnaaJx5juQKO4d3M43JimvH/hfGezNE6NeTTbEAyttLZ/LdSYa/e9Douzk2+o+9cei4fnP83l78jEjjYZjQAAAAASUVORK5CYII=" alt="" width="32" height="32">
+  <h1>LASER! <span>LASER LASER!</span></h1>
+  <button id="open-about" class="banner-btn">ABOUT</button>
+  <button id="open-settings">SETTINGS</button>
+  <div id="status">connecting…</div>
+  <button id="blank" class="banner-btn">BLANK</button>
+</header>
+
+<main>
+<div class="panel" id="bank">
+  <h2>Pattern bank</h2>
+  <div class="bank-head">
+    <div class="bank-row">
+      <input id="pat-name" maxlength="32" placeholder="pattern name"
+             autocomplete="off" spellcheck="false">
+      <button id="pat-save">SAVE</button>
+    </div>
+    <div class="toggles" id="trans">
+      <span class="trans-label">transition</span>
+      <button id="t-instant">INSTANT</button>
+      <button id="t-xfade">XFADE</button>
+    </div>
+  </div>
+  <div id="pat-list"></div>
+      <button id="pat-random" class="bank-random">🎲 RANDOM PATTERN</button>
+</div>
+  <div id="stage">
+    <div id="scope-wrap">
+      <canvas id="scope" width="800" height="800"></canvas>
+      <div id="blank-veil">BLANKED</div>
+    </div>
+
+  </div>
+
+  <div id="controls">
+    <div class="ccol">
+      <div class="panel">
+        <h2>Shape</h2>
+        <div class="shapes" id="shapes"></div>
+      </div>
+      <div class="panel">
+        <h2>Geometry</h2>
+        <div id="geo"></div>
+        <div class="toggles">
+          <button id="t-size_link" title="link size X and Y to the same value">🔗 LINK SIZE</button>
+          <button id="t-pause">PAUSE</button>
+          <button id="stop-spin">STOP SPIN</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Position</h2>
+        <div id="pos"></div>
+        <div class="toggles">
+          <button id="t-flip_x">FLIP X</button>
+          <button id="t-flip_y">FLIP Y</button>
+        </div>
+      </div>
+    </div>
+    <div class="ccol">
+      <div class="panel">
+        <h2>Duplicator</h2>
+        <div id="dup"></div>
+        <div class="toggles">
+          <button id="t-dup_mirror_x">MIRROR X</button>
+          <button id="t-dup_mirror_y">MIRROR Y</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Audio</h2>
+        <div id="aud"></div>
+        <div class="meters">
+          <div class="meter"><div class="bar"><i id="m-bass"></i></div><span>BASS</span></div>
+          <div class="meter"><div class="bar"><i id="m-mid"></i></div><span>MID</span></div>
+          <div class="meter"><div class="bar"><i id="m-high"></i></div><span>HIGH</span></div>
+        </div>
+        <div class="aud-routes">
+          <label>bass →<select id="aud-bass" data-key="aud_bass_dest"></select></label>
+          <label>mid →<select id="aud-mid" data-key="aud_mid_dest"></select></label>
+          <label>high →<select id="aud-high" data-key="aud_high_dest"></select></label>
+        </div>
+        <div class="toggles">
+          <button id="t-audio_off">AUDIO STOP</button>
+        </div>
+        <div class="scope-modes" id="scope-modes"></div>
+      </div>
+      <div class="panel">
+        <h2>Colour</h2>
+        <div id="col"></div>
+        <div class="toggles">
+          <button id="t-mono">MONO</button>
+        </div>
+      </div>
+    </div>
+    <div class="ccol">
+      <div class="panel">
+        <h2>Oscillator</h2>
+        <div class="osc-row">
+          <select id="lfo-target" title="parameter the oscillator sweeps"></select>
+          <select id="lfo-wave" title="oscillator waveform"></select>
+        </div>
+        <div id="lfo"></div>
+      </div>
+      <div class="panel">
+        <h2>Wave shape</h2>
+        <div class="osc-row">
+          <select id="wave-type" title="waveform for the 'wave' shape"></select>
+        </div>
+        <div class="map-hint" style="margin:0">cycles = ratio A · amplitude/duty = morph</div>
+      </div>
+      <div class="panel">
+        <h2>Vectoriser</h2>
+        <div class="ilda-row">
+          <select id="vec-cam"><option value="">source: off</option></select>
+          <button id="vec-upload" title="or drag an image anywhere onto the page">IMAGE</button>
+          <input id="vec-input" type="file"
+                 accept=".png,.jpg,.jpeg,.webp,.bmp,.gif" hidden>
+        </div>
+        <div id="vec"></div>
+        <div class="ilda-status" id="vec-status"></div>
+      </div>
+      <div class="panel">
+        <h2>ILDA</h2>
+        <div class="ilda-row">
+          <select id="ilda-file"><option value="">— no file —</option></select>
+          <button id="ilda-upload" title="or drag a .ild file anywhere onto the page">UPLOAD</button>
+          <input id="ilda-input" type="file" accept=".ild,.ILD" hidden>
+        </div>
+        <div id="ildap"></div>
+        <div class="toggles" id="ilda-mode">
+          <button data-v="0">LOOP</button>
+          <button data-v="1">PING-PONG</button>
+          <button data-v="2">SINGLE</button>
+        </div>
+        <div class="ilda-status" id="ilda-status"></div>
+      </div>
+    </div>
+  </div>
+  </main>
+<div id="conn"></div>
+
+<div id="about-modal" hidden>
+  <div class="modal-card about-card">
+    <div class="modal-head">
+      <h2>About</h2>
+      <button id="close-about">CLOSE</button>
+    </div>
+    <div id="about-body" class="about-body">loading…</div>
+  </div>
+</div>
+
+<div id="settings-modal" hidden>
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2>Settings</h2>
+      <button id="close-settings">CLOSE</button>
+    </div>
+    <h3 style="margin-top:0">MIDI input</h3>
+    <div class="set-row"><label for="midi-port">port</label>
+      <select id="midi-port" style="max-width:100%">
+        <option value="">— disconnected —</option>
+      </select></div>
+    <div class="set-row"><label>activity</label>
+      <span id="midi-act"><i class="mdot"></i><span id="midi-count">0 messages</span></span></div>
+    <h3>Engine</h3>
+    <div class="set-row"><label for="set-points">points / frame</label>
+      <input id="set-points" type="number" min="100" max="3000" step="50"></div>
+    <div class="set-row"><label for="set-pps">scan rate (pps)</label>
+      <input id="set-pps" type="number" min="5000" max="65535" step="1000"></div>
+    <div class="set-row"><label for="set-xft">xfade time (s)</label>
+      <input id="set-xft" type="number" min="0.1" max="10" step="0.1"></div>
+    <div class="set-row"><label>projector orientation</label>
+      <div class="toggles">
+        <button id="set-hwx">HW FLIP X</button>
+        <button id="set-hwy">HW FLIP Y</button>
+      </div></div>
+    <h3>Projection geometry</h3>
+    <div class="map-hint">Corrects keystone and distortion on the
+      <em>laser output only</em> — the preview is unaffected. Show the
+      test pattern, then drag the four corners to match your surface.</div>
+    <div class="geom-wrap">
+      <canvas id="geom-canvas" width="260" height="260"></canvas>
+    </div>
+    <div class="set-row"><label for="geom-pin">pincushion / barrel</label>
+      <input id="geom-pin" type="range" min="-1" max="1" step="0.01" value="0"></div>
+    <div class="toggles">
+      <button id="geom-test-btn">SHOW TEST PATTERN</button>
+      <button id="geom-reset-btn">RESET GEOMETRY</button>
+    </div>
+    <h3>MIDI mapping</h3>
+    <div class="map-hint">LEARN, then move a knob on your controller.
+      Highlighted CC numbers are custom; × returns a row to its default.</div>
+    <table id="map-table"></table>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ---------------- fader definitions ---------------- */
+const FADERS = {
+  geo: [
+    ["ratio_a", "ratio A", 1, 12, 1],
+    ["ratio_b", "ratio B", 1, 12, 1],
+    ["morph",   "morph",   0, 1, 0.001],
+    ["spin",    "spin",    0, 1, 0.001],
+    ["size",    "size x",  0, 1, 0.001],
+    ["size_y",  "size y",  0, 1, 0.001],
+  ],
+  col: [
+    ["hue",        "hue",        0, 1, 0.001],
+    ["hue_cycle",  "hue cycle",  0, 1, 0.001],
+    ["brightness", "brightness", 0, 1, 0.001],
+    ["dotify",     "dotify",     0, 1, 0.001],
+  ],
+  aud: [
+    ["audio_amt", "amount", 0, 1, 0.001],
+  ],
+  pos: [
+    ["pos_x",         "x pos",       0, 1, 0.001],
+    ["pos_y",         "y pos",       0, 1, 0.001],
+    ["sweep_x",       "sweep x",     0, 1, 0.001],
+    ["sweep_x_speed", "x speed",     0, 1, 0.001],
+    ["sweep_y",       "sweep y",     0, 1, 0.001],
+    ["sweep_y_speed", "y speed",     0, 1, 0.001],
+  ],
+  dup: [
+    ["dup_count",  "copies",  1, 6, 1],
+    ["dup_spread", "spread",  0, 1, 0.001],
+    ["dup_scale",  "falloff", 0, 1, 0.001],
+    ["dup_spin",   "orbit",   0, 1, 0.001],
+  ],
+  ildap: [
+    ["ilda_rate", "playback", 0, 1, 0.001],
+  ],
+  lfo: [
+    ["lfo_rate",    "rate",    0, 1, 0.001],
+    ["lfo_depth",   "depth",   0, 1, 0.001],
+    ["lfo_dropoff", "dropoff", 0, 1, 0.001],
+  ],
+  vec: [
+    ["vec_bright",   "brightness", 0, 1, 0.001],
+    ["vec_contrast", "contrast",   0, 1, 0.001],
+    ["vec_thresh",   "threshold",  0, 1, 0.001],
+    ["vec_detail",   "detail",     0, 1, 0.001],
+  ],
+};
+
+const inputs = {};   // key -> {range, out, step}
+let dragging = null; // key currently being dragged (don't clobber from state)
+
+for (const [panelId, defs] of Object.entries(FADERS)) {
+  const host = document.getElementById(panelId);
+  for (const [key, label, min, max, step] of defs) {
+    const row = document.createElement("div");
+    row.className = "fader";
+    row.innerHTML = `<label for="f-${key}">${label}</label>
+      <input id="f-${key}" type="range" min="${min}" max="${max}" step="${step}">
+      <output for="f-${key}">–</output>`;
+    host.appendChild(row);
+    const range = row.querySelector("input");
+    const out = row.querySelector("output");
+    range.addEventListener("input", () => {
+      out.textContent = fmt(range.value, step);
+      send({ type: "set", key, value: parseFloat(range.value) });
+      // size link: moving X or Y drags the other to match when linked
+      if ((key === "size" || key === "size_y") && sizeLinked) {
+        const other = key === "size" ? "size_y" : "size";
+        if (inputs[other]) {
+          inputs[other].range.value = range.value;
+          inputs[other].out.textContent = fmt(range.value, step);
+          send({ type: "set", key: other, value: parseFloat(range.value) });
+        }
+      }
+    });
+    range.addEventListener("pointerdown", () => dragging = key);
+    range.addEventListener("pointerup",   () => dragging = null);
+    inputs[key] = { range, out, step };
+  }
+}
+const fmt = (v, step) => step >= 1 ? String(Math.round(v)) : (+v).toFixed(2);
+
+/* ---------------- shape buttons + blank ---------------- */
+const shapesEl = document.getElementById("shapes");
+let shapeBtns = [];
+function buildShapes(names) {
+  shapesEl.innerHTML = "";
+  shapeBtns = names.map((n, i) => {
+    const b = document.createElement("button");
+    b.textContent = n;
+    b.addEventListener("click", () => send({ type: "shape", index: i }));
+    shapesEl.appendChild(b);
+    return b;
+  });
+}
+
+const TOGGLES = ["mono", "flip_x", "flip_y", "dup_mirror_x", "dup_mirror_y",
+                 "audio_off", "size_link"];
+let sizeLinked = true;   // mirrors s.p.size_link for the fader-drag logic
+const toggleBtns = {};
+let lastP = {};
+for (const key of TOGGLES) {
+  const b = document.getElementById("t-" + key);
+  b.addEventListener("click", () => {
+    const turningOn = !((lastP[key] || 0) > 0.5);
+    send({ type: "set", key, value: turningOn ? 1 : 0 });
+    // when enabling the size link, snap Y to X immediately
+    if (key === "size_link" && turningOn && inputs.size && inputs.size_y) {
+      const v = inputs.size.range.value;
+      inputs.size_y.range.value = v;
+      inputs.size_y.out.textContent = fmt(v, inputs.size_y.step);
+      send({ type: "set", key: "size_y", value: parseFloat(v) });
+    }
+  });
+  toggleBtns[key] = b;
+}
+
+const blankBtn = document.getElementById("blank");
+let blanked = false;
+blankBtn.addEventListener("click", () =>
+  send({ type: "blank", value: !blanked }));
+
+/* ---------------- ILDA ---------------- */
+const ildaSel = document.getElementById("ilda-file");
+const ildaStatus = document.getElementById("ilda-status");
+let ildaFiles = [];
+
+ildaSel.addEventListener("change", () => {
+  if (ildaSel.value) send({ type: "ilda_select", name: ildaSel.value });
+});
+
+document.getElementById("ilda-upload").addEventListener("click", () =>
+  document.getElementById("ilda-input").click());
+document.getElementById("ilda-input").addEventListener("change", (e) => {
+  if (e.target.files[0]) uploadIlda(e.target.files[0]);
+  e.target.value = "";
+});
+
+async function uploadIlda(file) {
+  ildaStatus.textContent = "uploading " + file.name + "\u2026";
+  ildaStatus.className = "ilda-status";
+  try {
+    const res = await fetch("/upload_ilda", {
+      method: "POST", headers: { "X-Filename": file.name }, body: file });
+    const j = await res.json();
+    if (!j.ok) throw new Error(j.error || "upload failed");
+    ildaStatus.textContent = j.name + " \u00b7 " + j.frames + " frame(s)";
+    send({ type: "ilda_select", name: j.name });   // play it right away
+  } catch (err) {
+    ildaStatus.textContent = String(err.message || err);
+    ildaStatus.className = "ilda-status err";
+  }
+}
+
+let dragDepth = 0;
+document.addEventListener("dragenter", (e) => {
+  e.preventDefault();
+  if (++dragDepth === 1) document.body.classList.add("dragging");
+});
+document.addEventListener("dragleave", () => {
+  if (--dragDepth <= 0) { dragDepth = 0; document.body.classList.remove("dragging"); }
+});
+document.addEventListener("dragover", (e) => e.preventDefault());
+document.addEventListener("drop", (e) => {
+  e.preventDefault();
+  dragDepth = 0; document.body.classList.remove("dragging");
+  const f = e.dataTransfer.files && e.dataTransfer.files[0];
+  if (!f) return;
+  if (f.name.toLowerCase().endsWith(".ild")) uploadIlda(f);
+  else if (IMG_EXT.test(f.name)) uploadImage(f);
+});
+
+/* ---------------- vectoriser ---------------- */
+const vecCam = document.getElementById("vec-cam");
+const vecStatus = document.getElementById("vec-status");
+let vecCams = "";
+
+vecCam.addEventListener("change", () => {
+  const v = vecCam.value;
+  if (v === "") send({ type: "vec_source", mode: "off" });
+  else if (v === "image") send({ type: "vec_source", mode: "image" });
+  else send({ type: "vec_source", mode: "camera", device: parseInt(v, 10) });
+});
+
+document.getElementById("vec-upload").addEventListener("click", () =>
+  document.getElementById("vec-input").click());
+document.getElementById("vec-input").addEventListener("change", (e) => {
+  if (e.target.files[0]) uploadImage(e.target.files[0]);
+  e.target.value = "";
+});
+
+async function uploadImage(file) {
+  vecStatus.textContent = "uploading " + file.name + "…";
+  vecStatus.className = "ilda-status";
+  try {
+    const res = await fetch("/upload_image", { method: "POST", body: file });
+    const j = await res.json();
+    if (!j.ok) throw new Error(j.error || "upload failed");
+    vecStatus.textContent = "processing…";
+  } catch (err) {
+    vecStatus.textContent = String(err.message || err);
+    vecStatus.className = "ilda-status err";
+  }
+}
+
+const IMG_EXT = /\.(png|jpe?g|webp|bmp|gif)$/i;
+
+/* ---------------- pattern bank ---------------- */
+const patNameEl = document.getElementById("pat-name");
+const patListEl = document.getElementById("pat-list");
+let patternNames = [];
+let bankFingerprint = "";
+
+document.getElementById("t-instant").addEventListener("click", () =>
+  send({ type: "xfade", value: false }));
+document.getElementById("t-xfade").addEventListener("click", () =>
+  send({ type: "xfade", value: true }));
+
+const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+const noteName = (n) => NOTE_NAMES[n % 12] + (Math.floor(n / 12) - 1);
+
+document.getElementById("pat-save").addEventListener("click", savePattern);
+document.getElementById("pat-random").addEventListener("click", () =>
+  send({ type: "pattern_random" }));
+patNameEl.addEventListener("keydown", (e) => { if (e.key === "Enter") savePattern(); });
+function savePattern() {
+  const name = patNameEl.value.trim();
+  if (name) {
+    send({ type: "pattern_save", name });
+    patNameEl.value = "";   // clear so you don't accidentally overwrite
+  }
+}
+
+function renderBank(names, bindings, learn) {
+  patternNames = names;
+  patListEl.innerHTML = "";
+  if (!names.length) {
+    patListEl.innerHTML = '<span class="hint">no saved patterns — dial in a look, name it, hit SAVE</span>';
+    return;
+  }
+  for (const n of names) {
+    const chip = document.createElement("div");
+    chip.className = "chip";
+    const load = document.createElement("button");
+    load.className = "load";
+    load.textContent = n;
+    load.title = "load '" + n + "'";
+    load.addEventListener("click", () => {
+      send({ type: "pattern_load", name: n });
+      patNameEl.value = n;   // edit workflow: load, tweak, SAVE overwrites
+    });
+    const midi = document.createElement("button");
+    const bound = bindings && n in bindings;
+    midi.className = "midi" + (bound ? " bound" : "")
+                   + (learn === n ? " learning" : "");
+    midi.textContent = learn === n ? "…" : bound ? noteName(bindings[n]) : "♪";
+    midi.title = learn === n
+      ? "waiting for a MIDI note… click to cancel"
+      : bound
+        ? "bound to " + noteName(bindings[n]) + " (" + bindings[n] + ")"
+          + " — click to re-learn, shift-click to clear"
+        : "MIDI learn: click, then hit a key on your controller";
+    midi.addEventListener("click", (e) => {
+      if (e.shiftKey && bound) send({ type: "pattern_unbind", name: n });
+      else send({ type: "pattern_learn", name: n });
+    });
+    const del = document.createElement("button");
+    del.className = "del";
+    del.textContent = "×";
+    del.title = "delete '" + n + "'";
+    del.addEventListener("click", () => {
+      if (confirm('Delete pattern "' + n + '"?'))
+        send({ type: "pattern_delete", name: n });
+    });
+    chip.append(load, midi, del);
+    patListEl.appendChild(chip);
+  }
+}
+
+/* ---------------- oscillator (LFO) ---------------- */
+const LFO_TARGETS = ["morph","size","hue","ratio A","ratio B","spin",
+                     "pos X","pos Y","dup spread","dotify"];
+const LFO_WAVES = ["sine","triangle","square","saw","random"];
+const lfoTargetSel = document.getElementById("lfo-target");
+const lfoWaveSel = document.getElementById("lfo-wave");
+LFO_TARGETS.forEach((n,i) => {
+  const o = document.createElement("option"); o.value=i; o.textContent=n;
+  lfoTargetSel.appendChild(o);
+});
+LFO_WAVES.forEach((n,i) => {
+  const o = document.createElement("option"); o.value=i; o.textContent=n;
+  lfoWaveSel.appendChild(o);
+});
+lfoTargetSel.addEventListener("change", () =>
+  send({ type: "set", key: "lfo_target", value: parseInt(lfoTargetSel.value,10) }));
+lfoWaveSel.addEventListener("change", () =>
+  send({ type: "set", key: "lfo_wave", value: parseInt(lfoWaveSel.value,10) }));
+
+/* ---------------- audio routing + wave type ---------------- */
+const AUDIO_DESTS = ["off","size","morph","brightness","hue","spin",
+                     "dup spread","dotify","pos X","pos Y","ratio A"];
+const WAVE_TYPES2 = ["sine","triangle","saw","square","pulse"];
+const audSels = {
+  aud_bass_dest: document.getElementById("aud-bass"),
+  aud_mid_dest: document.getElementById("aud-mid"),
+  aud_high_dest: document.getElementById("aud-high"),
+};
+for (const [key, sel] of Object.entries(audSels)) {
+  AUDIO_DESTS.forEach((n,i) => {
+    const o=document.createElement("option"); o.value=i; o.textContent=n;
+    sel.appendChild(o);
+  });
+  sel.addEventListener("change", () =>
+    send({ type: "set", key, value: parseInt(sel.value,10) }));
+}
+const waveTypeSel = document.getElementById("wave-type");
+WAVE_TYPES2.forEach((n,i) => {
+  const o=document.createElement("option"); o.value=i; o.textContent=n;
+  waveTypeSel.appendChild(o);
+});
+waveTypeSel.addEventListener("change", () =>
+  send({ type: "set", key: "wave_type", value: parseInt(waveTypeSel.value,10) }));
+
+/* ---------------- scope modes ---------------- */
+const SCOPE_MODES = ["waveform", "vu meter", "spectrum", "radial", "xy"];
+const scopeModesEl = document.getElementById("scope-modes");
+const scopeBtns = SCOPE_MODES.map((name, i) => {
+  const b = document.createElement("button");
+  b.textContent = name;
+  b.title = "scope visual: " + name +
+    " (only affects the 'scope' shape)";
+  b.addEventListener("click", () =>
+    send({ type: "set", key: "scope_mode", value: i }));
+  scopeModesEl.appendChild(b);
+  return b;
+});
+const scopeHint = document.createElement("span");
+scopeHint.className = "hint";
+scopeHint.textContent = "scope shape only";
+scopeModesEl.appendChild(scopeHint);
+
+/* ---------------- ilda mode + pause + stop spin ---------------- */
+const ildaModeBtns = Array.from(
+  document.querySelectorAll("#ilda-mode button"));
+for (const b of ildaModeBtns)
+  b.addEventListener("click", () =>
+    send({ type: "set", key: "ilda_mode", value: parseInt(b.dataset.v, 10) }));
+
+let pausedNow = false;
+document.getElementById("t-pause").addEventListener("click", () =>
+  send({ type: "pause", value: !pausedNow }));
+document.getElementById("stop-spin").addEventListener("click", () =>
+  send({ type: "stop_spin" }));
+
+/* ---------------- about modal ---------------- */
+const aboutModal = document.getElementById("about-modal");
+const aboutBody = document.getElementById("about-body");
+let aboutLoaded = false;
+document.getElementById("open-about").addEventListener("click", async () => {
+  aboutModal.hidden = false;
+  if (!aboutLoaded) {
+    try {
+      const r = await fetch("/about");
+      const j = await r.json();
+      aboutBody.innerHTML = renderMarkdown(j.text || "");
+      aboutLoaded = true;
+    } catch { aboutBody.textContent = "Could not load about.md"; }
+  }
+});
+document.getElementById("close-about").addEventListener("click", () =>
+  aboutModal.hidden = true);
+aboutModal.addEventListener("click", (e) => {
+  if (e.target === aboutModal) aboutModal.hidden = true;
+});
+
+// tiny, safe markdown subset (headings, lists, bold/italic, code, links)
+function renderMarkdown(md) {
+  const esc = (t) => t.replace(/[<>&]/g, c =>
+    ({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]));
+  const lines = esc(md).split("\n");
+  let html = "", inList = false;
+  const inline = (t) => t
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*([^*]+)\*/g, "<em>$1</em>")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g,
+             '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  for (let line of lines) {
+    if (/^### /.test(line)) { if(inList){html+="</ul>";inList=false;}
+      html += "<h3>"+inline(line.slice(4))+"</h3>"; }
+    else if (/^## /.test(line)) { if(inList){html+="</ul>";inList=false;}
+      html += "<h2>"+inline(line.slice(3))+"</h2>"; }
+    else if (/^# /.test(line)) { if(inList){html+="</ul>";inList=false;}
+      html += "<h1>"+inline(line.slice(2))+"</h1>"; }
+    else if (/^[-*] /.test(line)) {
+      if(!inList){html+="<ul>";inList=true;}
+      html += "<li>"+inline(line.slice(2))+"</li>"; }
+    else if (line.trim()==="") { if(inList){html+="</ul>";inList=false;} }
+    else { if(inList){html+="</ul>";inList=false;}
+      html += "<p>"+inline(line)+"</p>"; }
+  }
+  if (inList) html += "</ul>";
+  return html;
+}
+
+/* ---------------- settings modal ---------------- */
+const modal = document.getElementById("settings-modal");
+document.getElementById("open-settings").addEventListener("click", () =>
+  modal.hidden = false);
+document.getElementById("close-settings").addEventListener("click", () =>
+  modal.hidden = true);
+modal.addEventListener("click", (e) => { if (e.target === modal) modal.hidden = true; });
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") { modal.hidden = true; aboutModal.hidden = true; }
+});
+
+const MAPPABLE = [];
+for (const defs of Object.values(FADERS))
+  for (const d of defs) MAPPABLE.push([d[0], d[1]]);
+MAPPABLE.push(["lfo_rate","lfo rate"], ["lfo_depth","lfo depth"],
+              ["lfo_dropoff","lfo dropoff"], ["lfo_target","lfo target"],
+              ["lfo_wave","lfo wave"], ["wave_type","wave type"],
+              ["aud_bass_dest","audio bass dest"],
+              ["aud_mid_dest","audio mid dest"],
+              ["aud_high_dest","audio high dest"],
+              ["size_link", "size link"],
+              ["mono", "mono"], ["flip_x", "flip X"], ["flip_y", "flip Y"],
+              ["dup_mirror_x", "dup mirror X"], ["dup_mirror_y", "dup mirror Y"],
+              ["ilda_mode", "ilda mode"], ["scope_mode", "scope mode"],
+              ["audio_off", "audio stop"],
+              // action buttons (momentary, fire on knob/button press)
+              ["act_pause", "\u25b6 pause (button)"],
+              ["act_stop_spin", "\u25b6 stop spin (button)"],
+              ["act_blank", "\u25b6 blank (button)"]);
+
+const setEls = {
+  points: document.getElementById("set-points"),
+  pps: document.getElementById("set-pps"),
+  xfade_time: document.getElementById("set-xft"),
+};
+for (const [key, el] of Object.entries(setEls))
+  el.addEventListener("change", () =>
+    send({ type: "setting", key, value: parseFloat(el.value) }));
+const hwBtns = { hw_flip_x: document.getElementById("set-hwx"),
+                 hw_flip_y: document.getElementById("set-hwy") };
+let hwState = {};
+for (const [key, b] of Object.entries(hwBtns))
+  b.addEventListener("click", () =>
+    send({ type: "setting", key, value: !hwState[key] }));
+
+const midiPortSel = document.getElementById("midi-port");
+let midiPortsFp = "";
+midiPortSel.addEventListener("change", () =>
+  send({ type: "midi_port", name: midiPortSel.value }));
+
+const mapTable = document.getElementById("map-table");
+let mapFp = "";
+const FADER_KEYS = new Set();
+for (const defs of Object.values(FADERS))
+  for (const d of defs) FADER_KEYS.add(d[0]);
+function renderMap(ccMap, ccCustom, ccMode, learnParam) {
+  mapTable.innerHTML = "";
+  for (const [key, label] of MAPPABLE) {
+    const tr = document.createElement("tr");
+    const cc = (key in (ccCustom || {})) ? ccCustom[key] : ccMap[key];
+    const isCustom = key in (ccCustom || {});
+    const tdName = document.createElement("td");
+    tdName.textContent = label;
+    const tdCc = document.createElement("td");
+    tdCc.className = "cc" + (isCustom ? " custom" : "");
+    tdCc.textContent = cc !== undefined ? "CC " + cc : "—";
+    const tdMode = document.createElement("td");
+    if (FADER_KEYS.has(key)) {
+      const sel = document.createElement("select");
+      sel.className = "mode-sel";
+      for (const [v, lbl] of [["absolute","abs"],["relative","rel"],
+                              ["catch","catch"]]) {
+        const o = document.createElement("option");
+        o.value = v; o.textContent = lbl;
+        if ((ccMode[key] || "absolute") === v) o.selected = true;
+        sel.appendChild(o);
+      }
+      sel.title = "abs: 0-127 direct  |  rel: endless encoder deltas  |  "
+                + "catch: soft takeover (no jump on pattern load)";
+      sel.addEventListener("change", () =>
+        send({ type: "midi_mode", param: key, mode: sel.value }));
+      tdMode.appendChild(sel);
+    }
+    const tdLearn = document.createElement("td");
+    const lb = document.createElement("button");
+    lb.textContent = learnParam === key ? "…" : "LEARN";
+    lb.className = learnParam === key ? "learning" : "";
+    lb.addEventListener("click", () =>
+      send({ type: "midi_learn_cc", param: key }));
+    tdLearn.appendChild(lb);
+    const tdClr = document.createElement("td");
+    if (isCustom) {
+      const xb = document.createElement("button");
+      xb.textContent = "×";
+      xb.title = "back to default";
+      xb.addEventListener("click", () =>
+        send({ type: "midi_unmap", param: key }));
+      tdClr.appendChild(xb);
+    }
+    tr.append(tdName, tdCc, tdMode, tdLearn, tdClr);
+    mapTable.appendChild(tr);
+  }
+}
+
+/* ---------------- projection geometry editor ---------------- */
+const geomCanvas = document.getElementById("geom-canvas");
+const gctx = geomCanvas.getContext("2d");
+const GS = geomCanvas.width, GPAD = 30;
+// four corners as normalised offsets [-0.5,0.5]: TL,TR,BR,BL
+let corners = [0,0, 0,0, 0,0, 0,0];
+let pincushion = 0;
+let geomTest = false;
+let dragCorner = -1;
+
+// nominal corner pixel positions (before offset)
+const NOM = [[GPAD,GPAD], [GS-GPAD,GPAD], [GS-GPAD,GS-GPAD], [GPAD,GS-GPAD]];
+function cornerPx(i) {
+  const span = GS - 2*GPAD;
+  return [NOM[i][0] + corners[i*2] * span,
+          NOM[i][1] + corners[i*2+1] * span];
+}
+function drawGeom() {
+  gctx.clearRect(0,0,GS,GS);
+  // reference rectangle (faint)
+  gctx.strokeStyle = "#2a3344"; gctx.lineWidth = 1;
+  gctx.strokeRect(GPAD,GPAD,GS-2*GPAD,GS-2*GPAD);
+  // warped quad
+  const p = [0,1,2,3].map(cornerPx);
+  gctx.strokeStyle = "#d8e6f2"; gctx.lineWidth = 1.5;
+  gctx.beginPath(); gctx.moveTo(p[0][0],p[0][1]);
+  for (let i=1;i<4;i++) gctx.lineTo(p[i][0],p[i][1]);
+  gctx.closePath(); gctx.stroke();
+  // corner handles
+  for (let i=0;i<4;i++) {
+    gctx.fillStyle = i===dragCorner ? "#d8e6f2" : "#4ade80";
+    gctx.beginPath(); gctx.arc(p[i][0],p[i][1],6,0,7); gctx.fill();
+  }
+  gctx.fillStyle = "#5c6778"; gctx.font = "10px monospace";
+  gctx.fillText("drag corners", GPAD, GS-8);
+}
+function geomEventPos(e) {
+  const r = geomCanvas.getBoundingClientRect();
+  const t = e.touches ? e.touches[0] : e;
+  return [t.clientX - r.left, t.clientY - r.top];
+}
+geomCanvas.addEventListener("pointerdown", (e) => {
+  const [mx,my] = geomEventPos(e);
+  for (let i=0;i<4;i++) {
+    const [cx,cy] = cornerPx(i);
+    if (Math.hypot(mx-cx,my-cy) < 14) { dragCorner = i;
+      geomCanvas.setPointerCapture(e.pointerId); drawGeom(); break; }
+  }
+});
+geomCanvas.addEventListener("pointermove", (e) => {
+  if (dragCorner < 0) return;
+  const [mx,my] = geomEventPos(e);
+  const span = GS - 2*GPAD;
+  corners[dragCorner*2]   = Math.max(-0.5, Math.min(0.5, (mx-NOM[dragCorner][0])/span));
+  corners[dragCorner*2+1] = Math.max(-0.5, Math.min(0.5, (my-NOM[dragCorner][1])/span));
+  drawGeom();
+});
+function endDrag() {
+  if (dragCorner < 0) return;
+  dragCorner = -1;
+  send({ type: "geom_corners", corners });
+  drawGeom();
+}
+geomCanvas.addEventListener("pointerup", endDrag);
+geomCanvas.addEventListener("pointercancel", endDrag);
+
+const geomPin = document.getElementById("geom-pin");
+geomPin.addEventListener("input", () => {
+  pincushion = parseFloat(geomPin.value);
+  send({ type: "geom_pincushion", value: pincushion });
+});
+document.getElementById("geom-test-btn").addEventListener("click", () =>
+  send({ type: "geom_test", value: !geomTest }));
+document.getElementById("geom-reset-btn").addEventListener("click", () => {
+  corners = [0,0,0,0,0,0,0,0]; pincushion = 0; geomPin.value = 0;
+  send({ type: "geom_reset" }); drawGeom();
+});
+drawGeom();
+
+/* ---------------- websocket ---------------- */
+let ws = null;
+const conn = document.getElementById("conn");
+function connect() {
+  ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.binaryType = "arraybuffer";
+  ws.onopen = () => { conn.textContent = ""; conn.className = ""; };
+  ws.onclose = () => {
+    conn.textContent = "link lost — retrying"; conn.className = "lost";
+    setTimeout(connect, 1000);
+  };
+  ws.onmessage = (ev) => {
+    if (typeof ev.data === "string") onState(JSON.parse(ev.data));
+    else onFrame(ev.data);
+  };
+}
+const send = (obj) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); };
+connect();
+
+/* ---------------- state sync ---------------- */
+const statusEl = document.getElementById("status");
+function onState(s) {
+  if (s.type !== "state") return;
+  if (shapeBtns.length !== s.shapes.length) buildShapes(s.shapes);
+  shapeBtns.forEach((b, i) => b.classList.toggle("active", i === (s.p.shape|0)));
+  for (const [key, ui] of Object.entries(inputs)) {
+    if (key === dragging || !(key in s.p)) continue;
+    ui.range.value = s.p[key];
+    ui.out.textContent = fmt(s.p[key], ui.step);
+  }
+  lastP = s.p;
+  const fp = JSON.stringify([s.patterns, s.bindings, s.learn]);
+  if (fp !== bankFingerprint) {
+    bankFingerprint = fp;
+    renderBank(s.patterns || [], s.bindings || {}, s.learn);
+  }
+  const vec = s.vec || {};
+  const camsFp = JSON.stringify([vec.cameras, vec.have_image]);
+  if (camsFp !== vecCams) {
+    vecCams = camsFp;
+    let opts = '<option value="">source: off</option>';
+    if (vec.have_image) opts += '<option value="image">uploaded image</option>';
+    for (const c of (vec.cameras || []))
+      opts += `<option value="${c.id}">${String(c.name).replace(/[<>&"]/g, ch =>
+        ({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[ch]))}</option>`;
+    vecCam.innerHTML = opts;
+  }
+  if (document.activeElement !== vecCam) {
+    vecCam.value = vec.mode === "camera" ? String(vec.device)
+                 : vec.mode === "image" ? "image" : "";
+  }
+  if (vecStatus.className.indexOf("err") < 0 || vec.mode !== "off")
+    vecStatus.textContent = vec.status || "";
+  const files = s.ilda_files || [];
+  if (JSON.stringify(files) !== JSON.stringify(ildaFiles)) {
+    ildaFiles = files;
+    const cur = ildaSel.value;
+    ildaSel.innerHTML = '<option value="">\u2014 no file \u2014</option>' +
+      files.map(f => `<option>${f.replace(/[<>&"]/g, c =>
+        ({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c]))}</option>`).join("");
+    ildaSel.value = cur;
+  }
+  if (document.activeElement !== ildaSel && (s.ilda_file || "") !== ildaSel.value)
+    ildaSel.value = s.ilda_file || "";
+  document.getElementById("t-instant").classList.toggle("active", !s.xfade);
+  document.getElementById("t-xfade").classList.toggle("active", !!s.xfade);
+  for (const [key, sel] of Object.entries(audSels))
+    if (document.activeElement !== sel) sel.value = Math.round(s.p[key] || 0);
+  if (document.activeElement !== waveTypeSel)
+    waveTypeSel.value = Math.round(s.p.wave_type || 0);
+  if (document.activeElement !== lfoTargetSel)
+    lfoTargetSel.value = Math.round(s.p.lfo_target || 0);
+  if (document.activeElement !== lfoWaveSel)
+    lfoWaveSel.value = Math.round(s.p.lfo_wave || 0);
+  const sm = Math.round(s.p.scope_mode || 0);
+  scopeBtns.forEach((b, i) => b.classList.toggle("active", i === sm));
+  pausedNow = !!s.paused;
+  document.getElementById("t-pause").classList.toggle("active", pausedNow);
+  const im = Math.round((s.p.ilda_mode || 0));
+  for (const b of ildaModeBtns)
+    b.classList.toggle("active", parseInt(b.dataset.v, 10) === im);
+  const st = s.settings || {};
+  for (const [key, el] of Object.entries(setEls))
+    if (document.activeElement !== el && st[key] !== undefined)
+      el.value = st[key];
+  hwState = { hw_flip_x: !!st.hw_flip_x, hw_flip_y: !!st.hw_flip_y };
+  for (const [key, b] of Object.entries(hwBtns))
+    b.classList.toggle("active", hwState[key]);
+  const gm = s.geom || {};
+  if (dragCorner < 0 && gm.corners &&
+      JSON.stringify(gm.corners) !== JSON.stringify(corners)) {
+    corners = gm.corners.slice(); drawGeom();
+  }
+  if (document.activeElement !== geomPin && gm.pincushion !== undefined
+      && gm.pincushion !== pincushion) {
+    pincushion = gm.pincushion; geomPin.value = pincushion;
+  }
+  geomTest = !!gm.test;
+  const gtb = document.getElementById("geom-test-btn");
+  gtb.classList.toggle("active", geomTest);
+  gtb.textContent = geomTest ? "HIDE TEST PATTERN" : "SHOW TEST PATTERN";
+  const mfp = JSON.stringify([s.cc_map, s.cc_custom, s.cc_mode, s.midi_learn_param]);
+  if (mfp !== mapFp) {
+    mapFp = mfp;
+    renderMap(s.cc_map || {}, s.cc_custom || {}, s.cc_mode || {},
+              s.midi_learn_param);
+  }
+  for (const key of TOGGLES)
+    toggleBtns[key].classList.toggle("active", s.p[key] > 0.5);
+  sizeLinked = (s.p.size_link || 0) > 0.5;
+  blanked = !!s.blanked;
+  blankBtn.classList.toggle("on", blanked);
+  blankBtn.textContent = blanked ? "UNBLANK" : "BLANK";
+  document.getElementById("scope-wrap").classList.toggle("blanked", blanked);
+  const mi = s.midi || {};
+  statusEl.innerHTML =
+    `<b>${s.fps.toFixed(0)}</b> fps · ` +
+    `<i class="mdot${mi.active ? " on" : ""}"></i>midi <b>${esc(mi.port || "none")}</b> · ` +
+    (s.laser ? `laser <b>live</b>` : `laser <b>off</b>`);
+  const pfp = JSON.stringify([mi.ports, mi.port]);
+  if (pfp !== midiPortsFp) {
+    midiPortsFp = pfp;
+    let opts = '<option value="">\u2014 disconnected \u2014</option>';
+    for (const p of (mi.ports || []))
+      opts += `<option${p === mi.port ? " selected" : ""}>${esc(p)}</option>`;
+    midiPortSel.innerHTML = opts;
+  }
+  document.querySelector("#midi-act .mdot").classList.toggle("on", !!mi.active);
+  document.getElementById("midi-count").textContent =
+    (mi.count || 0) + " message" + (mi.count === 1 ? "" : "s") +
+    (mi.port === "none" || !mi.port ? " \u2014 no port connected" : "");
+}
+const esc = (t) => String(t).replace(/[<>&]/g, c => ({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]));
+
+/* ---------------- beam rendering ---------------- */
+const canvas = document.getElementById("scope");
+const ctx = canvas.getContext("2d");
+const meters = {
+  bass: document.getElementById("m-bass"),
+  mid:  document.getElementById("m-mid"),
+  high: document.getElementById("m-high"),
+};
+
+function onFrame(buf) {
+  const dv = new DataView(buf);
+  const n = dv.getUint16(0, true);
+  meters.bass.style.height = (dv.getUint8(2) / 2.55) + "%";
+  meters.mid.style.height  = (dv.getUint8(3) / 2.55) + "%";
+  meters.high.style.height = (dv.getUint8(4) / 2.55) + "%";
+
+  const W = canvas.width, H = canvas.height;
+
+  // phosphor decay
+  ctx.globalCompositeOperation = "source-over";
+  ctx.fillStyle = "rgba(0,0,0,0.32)";
+  ctx.fillRect(0, 0, W, H);
+
+  if (n < 2) return;
+  ctx.globalCompositeOperation = "lighter";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  let off = 6; // 2 + 4 header bytes
+  let px = null, py = null, pr = 0, pg = 0, pb = 0;
+  for (let i = 0; i < n; i++) {
+    const x = dv.getUint16(off, true) / 0xFFF * W;
+    const y = (1 - dv.getUint16(off + 2, true) / 0xFFF) * H;
+    const r = dv.getUint8(off + 4), g = dv.getUint8(off + 5), b = dv.getUint8(off + 6);
+    off += 7;
+    if (px !== null) {
+      // halo pass
+      ctx.strokeStyle = `rgba(${pr},${pg},${pb},0.10)`;
+      ctx.lineWidth = 9;
+      ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(x, y); ctx.stroke();
+      // core pass
+      ctx.strokeStyle = `rgba(${pr},${pg},${pb},0.95)`;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(x, y); ctx.stroke();
+    }
+    px = x; py = y; pr = r; pg = g; pb = b;
+  }
+}
+</script>
+</body>
+</html>
