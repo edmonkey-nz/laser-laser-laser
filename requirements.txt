@@ -1,0 +1,11 @@
+# Laser! Laser Laser! — Python dependencies
+# Core (required):
+numpy
+mido
+python-rtmidi
+sounddevice
+pygame
+aiohttp
+
+# Optional — image/webcam vectoriser:
+# opencv-python-headless
