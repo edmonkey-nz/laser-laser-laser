@@ -1,11 +1,9 @@
 # Laser! Laser Laser!
-
+v1.0.0 - July 2026
 A realtime laser visuals synthesizer for the Helios DAC.
 
-This is your space — edit `about.md` in the project folder to put
-whatever you like here: setup notes, a cheat-sheet of your favourite
-patterns, safety reminders for your rig, credits, or show notes. The
-text renders as Markdown, light grey on black.
+Created using Claude.AI, but with a human in the loop orchestrating features, bugs and UX.
+
 
 ## Quick reference
 
@@ -15,6 +13,6 @@ text renders as Markdown, light grey on black.
   options.
 - Every fader and button can be mapped to your controller.
 
-## Notes
+Credits and licences in the 'Contributing.md'
+Github repo: https://github.com/edmonkeynz/laserx3
 
-_(your text here)_
