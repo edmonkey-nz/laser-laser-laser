@@ -7,10 +7,8 @@ Created using Claude.AI, but with a human in the loop orchestrating features, bu
 
 ## Quick reference
 
-- **Patterns** live on the left. Save a look, MIDI-learn a note to it,
-  and the RANDOM button invents new ones.
-- **Settings** holds MIDI mapping, projection geometry, and engine
-  options.
+- **Patterns** live on the left. Save a look, MIDI-learn a note to it, and the RANDOM button invents new ones.
+- **Settings** holds MIDI mapping, projection geometry, and engine options.
 - Every fader and button can be mapped to your controller.
 
 Credits and licences in the 'Contributing.md'

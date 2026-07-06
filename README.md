@@ -12,11 +12,14 @@ all from a browser control surface, MIDI, or the keyboard, with an
 oscillator, routable audio reactivity, a pattern bank, crossfades, and
 projection geometry correction.
 
-Runs on Ubuntu (Windows works too, see below). No build step; vanilla
+Runs on Ubuntu 26.04 (May work on Windows too, see below). No build step; vanilla
 Python + numpy, with a thin ctypes wrapper over the official Helios SDK.
+
+![Snapshot of web interface](laserlaserlaser01.png)
 
 ## ⚠️ Laser safety first
 
+TLDR; Don't be an idiot. 
 Point generation bugs can park the beam. This synth only draws closed
 curves (no static points), blanks on exit, and defaults to preview-only —
 but *you* are the safety system. Never run at full power into an
