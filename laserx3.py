@@ -3,11 +3,11 @@
 Laser! Laser Laser! — realtime laser visuals synth for the Helios DAC.
 
 Usage:
-  python3 lasersynth.py --preview              # screen only, no laser
-  python3 lasersynth.py --laser                # laser only
-  python3 lasersynth.py --laser --preview      # both
-  python3 lasersynth.py --list-midi            # show MIDI input ports
-  python3 lasersynth.py --laser --midi "MPK"   # match port by substring
+  python3 laserx3.py --preview              # screen only, no laser
+  python3 laserx3.py --laser                # laser only
+  python3 laserx3.py --laser --preview      # both
+  python3 laserx3.py --list-midi            # show MIDI input ports
+  python3 laserx3.py --laser --midi "MPK"   # match port by substring
 
 Keyboard (preview window):
   1-9 select shape   ←/→ ratio A   ↑/↓ ratio B   [ ] size

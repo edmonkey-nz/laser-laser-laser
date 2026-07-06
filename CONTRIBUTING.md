@@ -11,7 +11,7 @@ hope it's useful to other laser/synth tinkerers.
   properties intact. Test in `--preview` before `--laser`.
 - Keep the **no-build-step** philosophy: vanilla Python + a single
   self-contained `static/index.html` (no bundlers, no npm, no CDN).
-- Every code change should bump the version in `lasersynth.py`
+- Every code change should bump the version in `laserx3.py`
   (`__version__`) and add a `CHANGELOG.md` entry.
 
 ## Development
@@ -19,12 +19,12 @@ hope it's useful to other laser/synth tinkerers.
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python lasersynth.py --web        # screen only, no laser
+python laserx3.py --web        # screen only, no laser
 ```
 
 The architecture, in brief:
 - `shapes.py` — the render engine (all parameters, shapes, LFO, routing)
-- `lasersynth.py` — app entry, render loop, MIDI, DAC output
+- `laserx3.py` — app entry, render loop, MIDI, DAC output
 - `webui.py` + `static/index.html` — the browser control surface
 - `patterns.py` / `settings.py` / `ilda.py` / `vectorise.py` /
   `geometry.py` — feature modules, each fairly self-contained
