@@ -11,7 +11,7 @@ import numpy as np
 TWO_PI = 2.0 * np.pi
 
 SHAPE_NAMES = ["lissajous", "rose", "hypotrochoid", "wave", "harmonograph",
-               "polygon", "scope", "ilda", "vector"]
+               "polygon", "scope", "ilda", "vector", "text"]
 
 
 def polygon(n, phase, p):
@@ -115,6 +115,7 @@ WAVE_TYPES = ["sine", "triangle", "saw", "square", "pulse"]
 PARAM_BOUNDS = {
     "morph": (0.0, 1.0), "size": (0.02, 1.0), "hue": (0.0, 1.0),
     "ratio_a": (1.0, 12.0), "ratio_b": (1.0, 12.0), "spin": (0.0, 1.0),
+    "rotate": (0.0, 1.0),
     "pos_x": (0.0, 1.0), "pos_y": (0.0, 1.0), "dup_spread": (0.0, 1.0),
     "dotify": (0.0, 1.0), "brightness": (0.0, 1.0),
     "size_y": (0.02, 1.0),
@@ -246,6 +247,7 @@ class ShapeEngine:
             "shape": 0,
             "ratio_a": 3.0, "ratio_b": 2.0,
             "morph": 0.25, "spin": 0.55,
+            "rotate": 0.0,      # static rotation offset (0..1 = 0..360°)
             "size": 0.8, "hue": 0.0, "hue_cycle": 0.15,
             "size_y": 0.8,      # independent Y scale; "size" is the X scale
             "size_link": 1.0,   # >0.5: X and Y locked to the same value
@@ -292,6 +294,12 @@ class ShapeEngine:
         self.ilda_name = ""
         self.ilda_pos = 0.0       # playback position (fractional frames)
         self.vector_frame = None  # live frame from the image/webcam vectoriser
+        self.text_str = ""        # current text-shape string
+        self.text_style = 0       # 0 plain, 1 script, 2 bold
+        self.text_frame = None    # cached rendered text frame
+        # per-pattern PPS/points overrides (None = use system settings)
+        self.pattern_pps = None
+        self.pattern_points = None
         self.paused = False       # freezes all time-driven motion
         self.on_load = None       # optional callback when a pattern loads
         self.test_frame = None    # when set, overrides all shapes (alignment)
@@ -359,6 +367,13 @@ class ShapeEngine:
     def set_param(self, key, value):
         """External param change (fader/CC). Cancels any in-flight
         transition for that key so the user always wins."""
+        # switching to a source shape (text/ILDA/vector) defaults spin to
+        # stopped (0.5) — these are usually meant to sit still, not spin.
+        if key == "shape":
+            name = SHAPE_NAMES[int(value) % len(SHAPE_NAMES)]
+            prev = SHAPE_NAMES[int(self.p.get("shape", 0)) % len(SHAPE_NAMES)]
+            if name in ("text", "ilda", "vector") and name != prev:
+                self.p["spin"] = 0.5
         self.p[key] = value
         if self._trans:
             self._trans["from"].pop(key, None)
@@ -431,6 +446,17 @@ class ShapeEngine:
         base = p[tgt]
         eff[tgt] = float(np.clip(base + s * depth * (hi - lo) * 0.5, lo, hi))
         return eff
+
+    def set_text(self, string, style):
+        """Render text to the cached text frame (called on change only)."""
+        from text import render_text, STYLES
+        # keep up to 4 lines, each capped at 32 chars
+        lines = (string or "").split("\n")[:4]
+        self.text_str = "\n".join(ln[:32] for ln in lines)
+        self.text_style = int(style) % len(STYLES)
+        self.text_frame = render_text(self.text_str,
+                                      STYLES[self.text_style],
+                                      self.n_points)
 
     def set_ilda(self, frames, name):
         """Install a parsed ILDA file as the playback source."""
@@ -554,6 +580,12 @@ class ShapeEngine:
                 x, y, src_rgb, src_lit = self._placeholder(n)
             else:
                 x, y, src_rgb, src_lit = self._resample_src(fr, n)
+        elif name == "text":
+            fr = self.text_frame
+            if fr is None:
+                x, y, src_rgb, src_lit = self._placeholder(n)
+            else:
+                x, y, src_rgb, src_lit = self._resample_src(fr, n)
         elif name == "scope":
             x, y = scope(n, self.phase, p_mod, audio)
         else:
@@ -566,7 +598,9 @@ class ShapeEngine:
         # --- rotate + scale ----------------------------------------------
         spin = (p_mod["spin"] - 0.5) * 4.0        # -2..2 rad/s (audio-routable)
         self.rot = (self.rot + spin * dt) % TWO_PI
-        c, s = np.cos(self.rot), np.sin(self.rot)
+        # static rotate offset (0..1 -> 0..2pi), added to the spinning angle
+        angle = self.rot + p_mod.get("rotate", 0.0) * TWO_PI
+        c, s = np.cos(angle), np.sin(angle)
         xr = (x * c - y * s) * size
         yr = (x * s + y * c) * size_y
 

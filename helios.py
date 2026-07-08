@@ -29,8 +29,11 @@ class HeliosPoint(ctypes.Structure):
 
 def _lib_path():
     here = os.path.dirname(os.path.abspath(__file__))
-    if platform.system() == "Windows":
+    system = platform.system()
+    if system == "Windows":
         return os.path.join(here, "HeliosLaserDAC.dll")
+    if system == "Darwin":
+        return os.path.join(here, "libHeliosDacAPI.dylib")
     return os.path.join(here, "libHeliosDacAPI.so")
 
 

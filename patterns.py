@@ -38,17 +38,23 @@ class PatternBank:
     def names(self):
         return sorted(self.patterns)
 
-    def save(self, name, params, ilda_file=None):
+    def save(self, name, params, ilda_file=None, extra=None):
         name = str(name).strip()[:32]
         if not name:
             return False
         with self._lock:
             note = self.patterns.get(name, {}).get("midi_note")
-            self.patterns[name] = {
+            entry = {
                 "params": {k: float(v) for k, v in params.items()},
                 "midi_note": note,
                 "ilda_file": ilda_file or None,
             }
+            # optional extras: text, text_style, pps, points (any may be None)
+            for k in ("text", "text_style", "pps", "points"):
+                v = (extra or {}).get(k)
+                if v is not None and v != "":
+                    entry[k] = v
+            self.patterns[name] = entry
             self._write()
         print(f"[bank] saved pattern '{name}'")
         return True
@@ -95,7 +101,7 @@ class PatternBank:
 
     def apply_entry(self, name, engine, ilda_lib=None):
         """Load a pattern into the engine: params (snap or xfade), plus the
-        ILDA file it was saved with, if any. Shared by web UI and MIDI."""
+        ILDA file, text, and per-pattern PPS/points it was saved with."""
         entry = self.patterns.get(name)
         if not entry:
             return False
@@ -106,6 +112,12 @@ class PatternBank:
                 engine.set_ilda(frames, f)
             else:
                 print(f"[bank] pattern '{name}': ILDA file '{f}' unavailable")
+        # text (only if the pattern carried it)
+        if "text" in entry:
+            engine.set_text(entry["text"], entry.get("text_style", 0))
+        # per-pattern PPS/points overrides (None clears back to system)
+        engine.pattern_pps = entry.get("pps")
+        engine.pattern_points = entry.get("points")
         engine.apply_params(entry["params"])
         return True
 

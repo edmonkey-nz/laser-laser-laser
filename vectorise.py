@@ -41,17 +41,26 @@ TARGET_POINTS = 900     # engine resamples to its budget anyway
 
 
 def cameras():
-    """Enumerate V4L2 capture devices with human names (Linux)."""
+    """Enumerate capture devices. On Linux, reads V4L2 device names from
+    /sys; on macOS/Windows (no /dev/video), probes indices 0..5."""
+    import platform
     cams = []
-    for dev in sorted(glob.glob("/dev/video*"),
-                      key=lambda d: int(d.replace("/dev/video", ""))):
-        idx = int(dev.replace("/dev/video", ""))
-        name_file = f"/sys/class/video4linux/video{idx}/name"
-        try:
-            name = open(name_file).read().strip()
-        except OSError:
-            name = dev
-        cams.append({"id": idx, "name": f"{name} ({dev})"})
+    if platform.system() == "Linux":
+        for dev in sorted(glob.glob("/dev/video*"),
+                          key=lambda d: int(d.replace("/dev/video", ""))):
+            idx = int(dev.replace("/dev/video", ""))
+            name_file = f"/sys/class/video4linux/video{idx}/name"
+            try:
+                name = open(name_file).read().strip()
+            except OSError:
+                name = dev
+            cams.append({"id": idx, "name": f"{name} ({dev})"})
+        return cams
+    # macOS / Windows: no stable device list, so offer indices 0..5.
+    # OpenCV opens these lazily; we don't probe here to avoid slow/UI-
+    # blocking device access on every state broadcast.
+    for idx in range(6):
+        cams.append({"id": idx, "name": f"camera {idx}"})
     return cams
 
 
@@ -134,26 +143,31 @@ class VectorSource:
 
     # ------------------------------------------------ camera thread
     def _camera_loop(self):
-        cap = cv2.VideoCapture(self.device, cv2.CAP_V4L2)
+        import platform
+        # V4L2 backend on Linux; default (AVFoundation/DShow) elsewhere
+        if platform.system() == "Linux":
+            cap = cv2.VideoCapture(self.device, cv2.CAP_V4L2)
+        else:
+            cap = cv2.VideoCapture(self.device)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
         if not cap.isOpened():
-            self.status = f"camera /dev/video{self.device}: cannot open"
+            self.status = f"camera {self.device}: cannot open"
             print(f"[vec] {self.status}")
             return
-        self.status = f"camera /dev/video{self.device}: live"
+        self.status = f"camera {self.device}: live"
         print(f"[vec] {self.status}")
         t_frame = 1.0 / 15
         while not self._stop.is_set():
             t0 = time.monotonic()
             ok, bgr = cap.read()
             if not ok:
-                self.status = f"camera /dev/video{self.device}: read failed"
+                self.status = f"camera {self.device}: read failed"
                 break
             frame, npaths = self._process(bgr)
             if self.mode == "camera":       # may have switched meanwhile
                 self.engine.vector_frame = frame
-                self.status = (f"camera /dev/video{self.device}: "
+                self.status = (f"camera {self.device}: "
                                f"{npaths} path(s)")
             spare = t_frame - (time.monotonic() - t0)
             if spare > 0:
