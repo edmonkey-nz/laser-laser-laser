@@ -25,7 +25,7 @@ Default MIDI CC map (channel-agnostic):
   Notes from C1 (36) upward select shapes.
 """
 
-__version__ = "1.0.0"
+__version__ = "1.2.0"
 
 import argparse
 import sys
@@ -89,6 +89,7 @@ CC_MAP = {
     44: ("aud_high_dest", 0.0, 10.0),
     45: ("size_y", 0.02, 1.0),
     46: ("size_link", 0.0, 1.0),
+    47: ("rotate", 0.0, 1.0),
 }
 
 # value ranges for every MIDI-mappable parameter (used by custom mapping)
@@ -557,6 +558,14 @@ def main():
             now = time.monotonic()
             dt, last = now - last, now
 
+            # per-pattern PPS/points overrides win over system settings when
+            # a loaded pattern set them; otherwise fall back to the engine's
+            # configured values.
+            eff_points = int(engine.pattern_points or engine.n_points)
+            eff_pps = int(engine.pattern_pps or engine.pps)
+            if engine.n_points != eff_points:
+                engine.n_points = eff_points   # engine.frame() reads this
+
             vec.tick()
             a = audio.get() if (audio and audio.data) else None
             frame = engine.frame(dt, a)
@@ -577,10 +586,10 @@ def main():
                 out_frame = hw_orient(frame, engine.hw_flip_x,
                                       engine.hw_flip_y)
                 out_frame = geom.apply(out_frame)
-                if not dac.write_frame(out_frame, engine.pps):
+                if not dac.write_frame(out_frame, eff_pps):
                     print("[laser] frame dropped (DAC busy)")
             else:
-                frame_dt = engine.n_points / max(engine.pps, 1000)
+                frame_dt = eff_points / max(eff_pps, 1000)
                 spare = frame_dt - (time.monotonic() - now)
                 if spare > 0:
                     time.sleep(spare)

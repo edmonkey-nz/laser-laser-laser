@@ -3,6 +3,60 @@
 All notable changes to this project are documented here. This project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] — 2026-07-08
+
+### Added
+- **Multi-line text**: the text block is now a 4-line input; lines are
+  centred and the block auto-scales to fit the field.
+- **Rotate**: a static rotation offset in the Geometry panel (separate
+  from the continuous spin). Switching to a source shape (text / ILDA /
+  vector) now defaults spin to stopped.
+- **Colour swatches**: the hue fader is replaced by a strip of clickable
+  16×16 colour blocks. Hue remains a normal 0–1 parameter, so it's still
+  MIDI-mappable and saved in patterns.
+- Snapshot image added to the README.
+
+### Fixed
+- Lowercase `a` in the text font rendered as a malformed open loop; it's
+  now a proper bowl-and-stem glyph.
+
+### Changed
+- Removed the instructional text and CLEAR button from the per-pattern
+  PPS / points block (leave a field blank to use the system value).
+
+[1.2.0]: https://github.com/USERNAME/laser-laser-laser/releases/tag/v1.2.0
+
+## [1.1.1] — 2026-07-08
+
+### Added
+- **macOS support**: `helios.py` now loads `libHeliosDacAPI.dylib` on
+  macOS, and the webcam vectoriser falls back to index-based camera
+  selection (no V4L2) on macOS/Windows. Added a macOS build/setup section
+  to the README.
+
+### Changed
+- Restructured the README's Control section into logical groups
+  (Interfaces, Shapes, Modulation, Colour & beam, Position & geometry,
+  Sources, Pattern bank, Live actions, Settings) so related controls sit
+  together. Removed the fixed MIDI CC table — mappings are configured
+  entirely in Settings → MIDI mapping via LEARN.
+
+[1.1.1]: https://github.com/USERNAME/laser-laser-laser/releases/tag/v1.1.1
+
+## [1.1.0] — 2026-07-08
+
+### Added
+- **Text shape**: type a string to project it as laser text, in three
+  single-stroke vector fonts (plain, script, bold+outline) built for
+  efficiency. Includes macron vowels (ā ē ī ō ū) for te reo Māori, with
+  a quick macron button in the text block (under the visualiser).
+- **Per-pattern PPS / points override** (column 3): optionally pin a
+  scan rate and point count to an individual pattern; blank fields fall
+  back to the system settings. Saved and restored with the pattern,
+  excluded from the random generator, and not MIDI-mapped.
+
+[1.1.0]: https://github.com/USERNAME/laser-laser-laser/releases/tag/v1.1.0
+
 ## [1.0.0] — 2026-07-06
 
 First public release. A complete realtime laser visuals synthesizer for

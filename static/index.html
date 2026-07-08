@@ -135,6 +135,46 @@
     #controls { grid-template-columns: 1fr; }
   }
 
+  /* ---- hue swatches ---- */
+  .hue-swatches { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: .5rem; }
+  .hue-swatches button {
+    width: 16px; height: 16px; padding: 0; border: 1px solid #0006;
+    border-radius: 3px; cursor: pointer; box-sizing: border-box;
+  }
+  .hue-swatches button.active { outline: 2px solid var(--ink); outline-offset: 1px; }
+
+  /* ---- text panel (under visualiser) ---- */
+  #text-panel { max-width: min(100%, 479px); margin: 1rem auto 0; }
+  .text-row { display: flex; gap: .4rem; }
+  .text-row textarea {
+    flex: 1; min-width: 0; font: inherit; font-size: .85rem;
+    background: var(--track); color: var(--ink);
+    border: 1px solid transparent; border-radius: 4px; padding: .5rem .7rem;
+    resize: vertical; line-height: 1.35; font-family: inherit;
+  }
+  .text-row textarea:focus-visible { outline: 2px solid var(--accent); }
+  .text-row button {
+    font: inherit; font-size: 1rem; cursor: pointer; background: var(--track);
+    color: var(--ink); border: none; border-radius: 4px; padding: .4rem .7rem;
+  }
+  .text-styles { display: flex; gap: .4rem; margin-top: .5rem; }
+  .text-styles button {
+    flex: 1; font: inherit; font-size: .75rem; cursor: pointer;
+    background: var(--track); color: var(--ink); border: none;
+    border-radius: 4px; padding: .4rem; }
+  .text-styles button.active { background: var(--accent); color: #0a0c11; font-weight: 600; }
+  .text-styles button[data-s="1"] { font-style: italic; }
+  .text-styles button[data-s="2"] { font-weight: 700; }
+
+  /* ---- per-pattern override block ---- */
+  .ovr-row { display: grid; grid-template-columns: 4rem 1fr; gap: .5rem;
+    align-items: center; margin: .3rem 0; }
+  .ovr-row label { font-size: .75rem; color: var(--ink-dim); }
+  .ovr-row input { font: inherit; font-size: .78rem; background: var(--track);
+    color: var(--ink); border: 1px solid transparent; border-radius: 4px;
+    padding: .35rem .5rem; width: 100%; }
+  .ovr-row input:focus-visible { outline: 2px solid var(--accent); }
+
   /* ---- pattern bank (left column, vertical) ---- */
   #bank { min-width: 0; }
   .bank-head { display: flex; flex-direction: column; gap: .5rem; }
@@ -331,6 +371,20 @@
       <div id="blank-veil">BLANKED</div>
     </div>
 
+    <div class="panel" id="text-panel">
+      <h2>Text</h2>
+      <div class="text-row">
+        <textarea id="text-input" rows="4" maxlength="140"
+                  placeholder="type to project… (up to 4 lines)"
+                  autocomplete="off" spellcheck="false"></textarea>
+        <button id="text-macron" title="insert macron vowel">ā</button>
+      </div>
+      <div class="text-styles" id="text-styles">
+        <button data-s="0" class="active">plain</button>
+        <button data-s="1">script</button>
+        <button data-s="2">bold</button>
+      </div>
+    </div>
   </div>
 
   <div id="controls">
@@ -386,6 +440,7 @@
       </div>
       <div class="panel">
         <h2>Colour</h2>
+        <div class="hue-swatches" id="hue-swatches"></div>
         <div id="col"></div>
         <div class="toggles">
           <button id="t-mono">MONO</button>
@@ -433,6 +488,20 @@
           <button data-v="2">SINGLE</button>
         </div>
         <div class="ilda-status" id="ilda-status"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Per-pattern PPS / points</h2>
+        <div class="ovr-row">
+          <label for="ovr-pps">PPS</label>
+          <input id="ovr-pps" type="number" min="5000" max="65535"
+                 step="1000" placeholder="system">
+        </div>
+        <div class="ovr-row">
+          <label for="ovr-points">points</label>
+          <input id="ovr-points" type="number" min="100" max="3000"
+                 step="50" placeholder="system">
+        </div>
       </div>
     </div>
   </div>
@@ -504,11 +573,11 @@ const FADERS = {
     ["ratio_b", "ratio B", 1, 12, 1],
     ["morph",   "morph",   0, 1, 0.001],
     ["spin",    "spin",    0, 1, 0.001],
+    ["rotate",  "rotate",  0, 1, 0.001],
     ["size",    "size x",  0, 1, 0.001],
     ["size_y",  "size y",  0, 1, 0.001],
   ],
   col: [
-    ["hue",        "hue",        0, 1, 0.001],
     ["hue_cycle",  "hue cycle",  0, 1, 0.001],
     ["brightness", "brightness", 0, 1, 0.001],
     ["dotify",     "dotify",     0, 1, 0.001],
@@ -795,6 +864,73 @@ lfoTargetSel.addEventListener("change", () =>
   send({ type: "set", key: "lfo_target", value: parseInt(lfoTargetSel.value,10) }));
 lfoWaveSel.addEventListener("change", () =>
   send({ type: "set", key: "lfo_wave", value: parseInt(lfoWaveSel.value,10) }));
+
+/* ---------------- hue swatches ---------------- */
+const hueSwatchesEl = document.getElementById("hue-swatches");
+// 16 swatches spanning the hue wheel (0..1). Clicking sets hue directly
+// and forces MONO on, so the swatch always shows the flat colour you'll
+// actually get on screen (in rainbow/non-mono mode the shape shows every
+// hue at once, which would never match a single swatch tile).
+// hue stays a normal 0..1 param, so MIDI still maps to it continuously.
+const HUE_STEPS = 16;
+const hueBtns = [];
+for (let i = 0; i < HUE_STEPS; i++) {
+  const v = i / HUE_STEPS;
+  const b = document.createElement("button");
+  b.style.background = `hsl(${Math.round(v * 360)}, 100%, 50%)`;
+  b.title = `hue ${v.toFixed(3)}`;
+  b.dataset.hue = v;
+  b.addEventListener("click", () => {
+    send({ type: "set", key: "hue", value: v });
+    send({ type: "set", key: "mono", value: 1 });
+  });
+  hueSwatchesEl.appendChild(b);
+  hueBtns.push(b);
+}
+function syncHueSwatches(hue) {
+  // highlight the nearest swatch to the current hue value
+  const nearest = Math.round((hue % 1) * HUE_STEPS) % HUE_STEPS;
+  hueBtns.forEach((b, i) => b.classList.toggle("active", i === nearest));
+}
+
+/* ---------------- text ---------------- */
+const textInput = document.getElementById("text-input");
+const textStylesEl = document.getElementById("text-styles");
+let textStyle = 0;
+function sendText() {
+  send({ type: "text_set", text: textInput.value, style: textStyle });
+}
+textInput.addEventListener("input", sendText);
+for (const b of textStylesEl.querySelectorAll("button")) {
+  b.addEventListener("click", () => {
+    textStyle = parseInt(b.dataset.s, 10);
+    for (const x of textStylesEl.querySelectorAll("button"))
+      x.classList.toggle("active", x === b);
+    sendText();
+  });
+}
+// macron helper: cycle the last vowel through its macron form
+const MACRON = {a:"\u0101", e:"\u0113", i:"\u012b", o:"\u014d", u:"\u016b",
+                A:"\u0100", E:"\u0112", I:"\u012a", O:"\u014c", U:"\u016a"};
+document.getElementById("text-macron").addEventListener("click", () => {
+  const v = textInput.value;
+  const m = v.match(/[aeiouAEIOU]$/);
+  if (m) { textInput.value = v.slice(0, -1) + MACRON[m[0]]; }
+  else { textInput.value = v + "\u0101"; }
+  textInput.focus();
+  sendText();
+});
+
+/* ---------------- per-pattern PPS/points override ---------------- */
+const ovrPps = document.getElementById("ovr-pps");
+const ovrPoints = document.getElementById("ovr-points");
+function sendOverride() {
+  send({ type: "pattern_override",
+         pps: ovrPps.value ? parseInt(ovrPps.value,10) : null,
+         points: ovrPoints.value ? parseInt(ovrPoints.value,10) : null });
+}
+ovrPps.addEventListener("change", sendOverride);
+ovrPoints.addEventListener("change", sendOverride);
 
 /* ---------------- audio routing + wave type ---------------- */
 const AUDIO_DESTS = ["off","size","morph","brightness","hue","spin",
@@ -1152,6 +1288,20 @@ function onState(s) {
     ildaSel.value = s.ilda_file || "";
   document.getElementById("t-instant").classList.toggle("active", !s.xfade);
   document.getElementById("t-xfade").classList.toggle("active", !!s.xfade);
+  // text: reflect current string/style unless the user is editing
+  if (document.activeElement !== textInput && (s.text || "") !== textInput.value)
+    textInput.value = s.text || "";
+  if ((s.text_style || 0) !== textStyle) {
+    textStyle = s.text_style || 0;
+    for (const b of textStylesEl.querySelectorAll("button"))
+      b.classList.toggle("active", parseInt(b.dataset.s,10) === textStyle);
+  }
+  // per-pattern override fields (don't clobber while editing)
+  const ov = s.override || {};
+  if (document.activeElement !== ovrPps)
+    ovrPps.value = ov.pps != null ? ov.pps : "";
+  if (document.activeElement !== ovrPoints)
+    ovrPoints.value = ov.points != null ? ov.points : "";
   for (const [key, sel] of Object.entries(audSels))
     if (document.activeElement !== sel) sel.value = Math.round(s.p[key] || 0);
   if (document.activeElement !== waveTypeSel)
@@ -1160,6 +1310,7 @@ function onState(s) {
     lfoTargetSel.value = Math.round(s.p.lfo_target || 0);
   if (document.activeElement !== lfoWaveSel)
     lfoWaveSel.value = Math.round(s.p.lfo_wave || 0);
+  syncHueSwatches(s.p.hue || 0);
   const sm = Math.round(s.p.scope_mode || 0);
   scopeBtns.forEach((b, i) => b.classList.toggle("active", i === sm));
   pausedNow = !!s.paused;

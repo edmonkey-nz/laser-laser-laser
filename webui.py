@@ -182,6 +182,12 @@ class WebUI:
                         },
                         "ilda_files": self.ilda.names(),
                         "ilda_file": self.engine.ilda_name,
+                        "text": self.engine.text_str,
+                        "text_style": self.engine.text_style,
+                        "override": {
+                            "pps": self.engine.pattern_pps,
+                            "points": self.engine.pattern_points,
+                        },
                         "vec": {"mode": self.vec.mode,
                                 "device": self.vec.device,
                                 "status": self.vec.status,
@@ -270,8 +276,15 @@ class WebUI:
         elif t == "blank":
             self.engine.blanked = bool(msg.get("value"))
         elif t == "pattern_save":
-            self.bank.save(msg.get("name", ""), dict(p),
-                           ilda_file=self.engine.ilda_name or None)
+            self.bank.save(
+                msg.get("name", ""), dict(p),
+                ilda_file=self.engine.ilda_name or None,
+                extra={
+                    "text": self.engine.text_str or None,
+                    "text_style": self.engine.text_style,
+                    "pps": self.engine.pattern_pps,
+                    "points": self.engine.pattern_points,
+                })
         elif t == "pattern_load":
             self.bank.apply_entry(msg.get("name", ""), self.engine,
                                   self.ilda)
@@ -280,9 +293,21 @@ class WebUI:
         elif t == "pattern_random":
             from shapes import ShapeEngine as _SE
             rp = _SE.random_params()
+            # random never sets per-pattern PPS/points overrides
+            self.engine.pattern_pps = None
+            self.engine.pattern_points = None
             self.engine.apply_params(rp)
-            if self.engine.on_load:
-                pass  # apply_params already fires on_load
+        elif t == "text_set":
+            self.engine.set_text(msg.get("text", ""),
+                                 int(msg.get("style", 0)))
+            from shapes import SHAPE_NAMES as _SN
+            self.engine.set_param("shape", _SN.index("text"))
+        elif t == "pattern_override":
+            # per-pattern PPS/points; empty/null clears back to system
+            v = msg.get("pps")
+            self.engine.pattern_pps = int(v) if v else None
+            v = msg.get("points")
+            self.engine.pattern_points = int(v) if v else None
         elif t == "xfade":
             self.engine.xfade = bool(msg.get("value"))
         elif t == "pattern_learn":
