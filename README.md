@@ -14,6 +14,9 @@ projection geometry correction.
 
 Runs on Ubuntu, Windows and macOS. No build step; vanilla
 Python + numpy, with a thin ctypes wrapper over the official Helios SDK.
+Note: only tested on Ubuntu 26.06
+
+Created using Claude.AI, but with a human in the loop requesting,orchestrating features, bugs and UX.
 
 ![Snapshot of web interface](laserlaserlaser01.png)
 
