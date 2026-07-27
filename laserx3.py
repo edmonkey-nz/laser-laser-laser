@@ -25,7 +25,7 @@ Default MIDI CC map (channel-agnostic):
   Notes from C1 (36) upward select shapes.
 """
 
-__version__ = "1.3.0"
+__version__ = "1.3.1"
 
 import argparse
 import sys
@@ -496,8 +496,10 @@ def main():
                          "if your projector is oriented the other way)")
     ap.add_argument("--hw-flip-y", action=argparse.BooleanOptionalAction,
                     default=False, help="mirror Y on the DAC output")
-    ap.add_argument("--web", action="store_true",
-                    help="serve browser control surface")
+    ap.add_argument("--web", action=argparse.BooleanOptionalAction,
+                    default=None,
+                    help="serve browser control surface (on by default; "
+                         "--no-web to disable)")
     ap.add_argument("--web-port", type=int, default=8080)
     ap.add_argument("--list-midi", action="store_true")
     args = ap.parse_args()
@@ -509,6 +511,8 @@ def main():
 
     if not args.laser and not args.preview and not args.web:
         args.preview = True  # sensible default: don't fire a laser by surprise
+    if args.web is None:
+        args.web = True  # on by default (including prebuilt executables); --no-web opts out
 
     import os as _os
     engine = ShapeEngine(n_points=args.points)

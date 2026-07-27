@@ -1,6 +1,6 @@
 # Laser! Laser Laser!
 
-![version](https://img.shields.io/badge/version-1.3.0-blueviolet)
+![version](https://img.shields.io/badge/version-1.3.1-blueviolet)
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![platform](https://img.shields.io/badge/platform-Ubuntu%20%7C%20Windows%20%7C%20macOS-informational)
 
@@ -175,14 +175,21 @@ identical to Linux.
 ## Running
 
 ```bash
-python3 laserx3.py --preview             # screen only — start here
-python3 laserx3.py --web                 # browser UI, then open http://laserx3:8080/
-python3 laserx3.py --laser --web         # laser + browser control
-python3 laserx3.py --laser --preview     # laser + pygame mirror
+python3 laserx3.py                       # pygame preview + browser UI (both on by default)
+python3 laserx3.py --laser               # laser + browser control
+python3 laserx3.py --laser --preview --no-web  # laser + pygame mirror, no browser UI
 python3 laserx3.py --list-midi           # find your controller
 python3 laserx3.py --laser --midi "MPK"  # match MIDI port by substring
 ```
 
+The browser control surface (`--web`) is on by default — including in
+the prebuilt executables — so opening `http://localhost:8080/` after
+launch always works; pass `--no-web` to turn it off. If none of
+`--laser`, `--preview` or `--web` are given (i.e. you just run the app
+with no flags), the pygame preview window opens too, same as before —
+so a bare launch on Windows still gets a visible window as well as
+browser control. Passing `--web` (or `--laser`) explicitly opts out of
+that preview-window fallback, so `--web` alone stays browser-only.
 Modes combine freely (`--laser --web --preview` all at once is fine).
 
 Options: `--points N` (default 800) and `--pps N` (default 30000).
@@ -515,7 +522,7 @@ timers needed when the laser is running.
 
 ## Version
 
-Current release: **1.3.0** (see `CHANGELOG.md`). Run `python laserx3.py
+Current release: **1.3.1** (see `CHANGELOG.md`). Run `python laserx3.py
 --version` to check the installed version.
 
 ## License

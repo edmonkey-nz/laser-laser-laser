@@ -3,6 +3,19 @@
 All notable changes to this project are documented here. This project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.3.1] — 2026-07-27
+
+### Fixed
+- **Browser UI now on by default**: the prebuilt executables (and the
+  bare `python laserx3.py` invocation) launched with `--web` off, so
+  double-clicking the Windows/macOS/Linux binary just showed the pygame
+  preview stuck on whatever pattern loaded, with no way to switch
+  patterns or otherwise control the synth. The browser control surface
+  is now on by default; `--no-web` opts back out. Explicit invocations
+  of `--web`, `--laser` and `--preview` keep their previous meanings.
+
+[1.3.1]: https://github.com/edmonkey-nz/laser-laser-laser/releases/tag/v1.3.1
+
 ## [1.3.0] — 2026-07-27
 
 ### Added
