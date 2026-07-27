@@ -24,4 +24,6 @@ Thumbs.db
 # Build artifacts (PyInstaller / AppImage etc.)
 build/
 dist/
+helios_lib/
 *.spec
+!pyinstaller.spec

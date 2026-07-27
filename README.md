@@ -1,32 +1,33 @@
 # Laser! Laser Laser!
 
-![version](https://img.shields.io/badge/version-1.2.0-blueviolet)
+![version](https://img.shields.io/badge/version-1.3.0-blueviolet)
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![platform](https://img.shields.io/badge/platform-Ubuntu%20%7C%20Windows%20%7C%20macOS-informational)
 
-Realtime vector visuals synthesizer for the Helios Laser DAC. Draw
-lissajous figures, rose curves, hypotrochoids, waveforms, harmonographs,
-polygons/stars (line → polygon → circle) and a live audio scope — or play
-ILDA files and vectorise images and webcam video into laser art. Drive it
-all from a browser control surface, MIDI, or the keyboard, with an
-oscillator, routable audio reactivity, a pattern bank, crossfades, and
-projection geometry correction.
+Realtime vector visuals synthesizer for the Helios Laser DAC. 
+- Lissajous figures, rose curves, hypotrochoids, waveforms, harmonographs,
+polygons/stars
+- Text input
+- Draw polygons directly and save as patterns
+- Advanced 'duplicator' functionailty 
+- Live audio scope (with various forms)
+- Random pattern generator
+- Play ILDA files
+- Vectorise raster images + live webcam video > laser paths
+- Custom PPS settings per pattern
+- Keystone ability
 
-Runs on Ubuntu, Windows and macOS. No build step; vanilla
-Python + numpy, with a thin ctypes wrapper over the official Helios SDK.
-Note: only tested on Ubuntu 26.06
+Browser-based UI, MIDI mappable, oscillators, routable audio reactivity, a pattern bank, crossfades, free-from plyand projection geometry correction.
 
-Created using Claude.AI, but with a human in the loop requesting,orchestrating features, bugs and UX.
 
-![Snapshot of web interface](laserlaserlaser01.png)
+Created using Claude.AI, but with a human in the loop requesting, orchestrating features, bugs and UX.
+
+![Snapshot of web interface](laserlaserlaser.png)
 
 ## ⚠️ Laser safety first
 TLDR; Don't be an idiot.
 Point generation bugs can park the beam. This synth only draws closed
-curves (no static points), blanks on exit, and defaults to preview-only —
-but *you* are the safety system. Never run at full power into an
-unscanned or unknown state, keep beam paths above head height or
-terminated, and test everything in `--preview` first.
+curves (no static points), blanks on exit. Test everything in `--preview` first.
 
 ## Files
 
@@ -50,6 +51,42 @@ terminated, and test everything in `--preview` first.
 - `libHeliosDacAPI.so` — Helios SDK shared library, built for x86-64
   Linux (Ubuntu 24.04, libusb-1.0). Rebuild instructions below.
 - `heliosdac.rules` — udev rule for non-root USB access
+- `pyinstaller.spec` + `.github/workflows/build.yml` — builds standalone
+  executables for Ubuntu, Windows and macOS (see *Prebuilt executables*
+  below)
+
+## Prebuilt executables
+
+Don't want to set up Python? Grab a zip from the
+[Releases page](https://github.com/edmonkey-nz/laser-laser-laser/releases) —
+one each for Ubuntu, Windows and macOS (Apple Silicon), built automatically
+by GitHub Actions (`.github/workflows/build.yml`) whenever a version tag is
+pushed. Unzip and run the `laser-laser-laser` executable inside — the
+folder contains everything needed (Python runtime, the Helios library,
+starter patterns), no install step.
+
+A few things to know:
+- **Unsigned binaries**: none of these are code-signed, so Windows
+  SmartScreen and macOS Gatekeeper will both flag them on first run.
+  Windows: "More info" → "Run anyway". macOS: right-click the executable
+  → "Open" (or `xattr -d com.apple.quarantine laser-laser-laser` in
+  Terminal) — plain double-clicking a Gatekeeper-blocked file just fails
+  silently otherwise.
+- **Linux needs `libusb-1.0-0` installed** (`sudo apt install
+  libusb-1.0-0` if it isn't already — most desktops have it). The Ubuntu
+  udev rule (`heliosdac.rules`) is included in the zip; see *Ubuntu
+  setup* below for how to install it.
+- **macOS build is Apple Silicon (arm64) only.** Older Intel Macs aren't
+  covered by the current workflow.
+- These are the same source files as this repo at that tag — nothing
+  extra is bundled beyond the Python runtime and dependencies (including
+  the optional OpenCV vectoriser, so that panel works out of the box).
+
+Maintainers: cutting a release is just `git tag vX.Y.Z && git push origin
+vX.Y.Z` — the workflow builds all three platforms and attaches them to a
+new GitHub Release automatically. `workflow_dispatch` (the "Run workflow"
+button in the Actions tab) builds without publishing, handy for testing
+the pipeline itself.
 
 ## Ubuntu setup
 
@@ -203,8 +240,9 @@ quit (blanks the laser on the way out).
 
 ### Shapes
 
-Nine generated shapes plus three external sources (ILDA, vectoriser,
-text — covered under *Sources* below). The maths shapes — lissajous,
+Seven generated shapes plus four external sources (ILDA, vectoriser,
+text, and a hand-drawn custom polygon — covered under *Sources* below).
+The maths shapes — lissajous,
 rose, hypotrochoid, wave, harmonograph, polygon and scope — share the
 ratio A / ratio B / morph controls, which each shape interprets in its
 own way.
@@ -338,7 +376,7 @@ between wall and screen). If your projector is mounted the other way,
 launch with `--no-hw-flip-x`; `--hw-flip-y` is there too. This is a
 hardware correction on the DAC stream only.
 
-### Sources: ILDA, vectoriser, text
+### Sources: ILDA, vectoriser, text, custom shape
 
 These three feed the render pipeline instead of a generated shape — and
 every effect above (spin, size, position, colour, dotify, duplicator,
@@ -378,6 +416,15 @@ as laser text in one of three single-stroke vector fonts — plain, script
 (no fills), so they scan efficiently. Macron vowels for te reo Māori are
 supported (ā ē ī ō ū); the **ā** button adds a macron to the last vowel
 typed. Selecting text switches the shape to `text`.
+
+**Custom shape** (Custom Shape panel, column 3): click EDIT POINTS… to
+open a point editor and draw your own polygon — straight edges connect
+the points in the order you click them, closing back to the first one.
+ADD mode places a new point on each click; SELECT lets you click-and-drag
+an existing point to reposition it; DELETE removes a clicked point.
+UNDO LAST and CLEAR ALL round out editing. USE SHAPE applies the points
+and switches to the `custom` shape (CLOSE discards the edit instead).
+Points are capped at 64 and saved/restored with the pattern.
 
 ### Pattern bank
 
@@ -468,7 +515,7 @@ timers needed when the laser is running.
 
 ## Version
 
-Current release: **1.2.0** (see `CHANGELOG.md`). Run `python laserx3.py
+Current release: **1.3.0** (see `CHANGELOG.md`). Run `python laserx3.py
 --version` to check the installed version.
 
 ## License

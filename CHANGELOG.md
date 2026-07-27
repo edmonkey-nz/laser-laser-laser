@@ -3,6 +3,20 @@
 All notable changes to this project are documented here. This project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] — 2026-07-27
+
+### Added
+- **Custom shape**: a point-and-click polygon editor. Add, select/drag,
+  and delete points in a modal editor; edges connect the points in click
+  order and close back to the first. Saved and restored per pattern
+  (capped at 64 points).
+- **Prebuilt executables**: a GitHub Actions workflow
+  (`.github/workflows/build.yml`) builds standalone Ubuntu/Windows/macOS
+  binaries with PyInstaller and publishes them to GitHub Releases on
+  every version tag.
+
+[1.3.0]: https://github.com/edmonkey-nz/laser-laser-laser/releases/tag/v1.3.0
+
 ## [1.2.0] — 2026-07-08
 
 ### Added
@@ -24,7 +38,7 @@ adheres to [Semantic Versioning](https://semver.org/).
 - Removed the instructional text and CLEAR button from the per-pattern
   PPS / points block (leave a field blank to use the system value).
 
-[1.2.0]: https://github.com/USERNAME/laser-laser-laser/releases/tag/v1.2.0
+[1.2.0]: https://github.com/edmonkey-nz/laser-laser-laser/releases/tag/v1.2.0
 
 ## [1.1.1] — 2026-07-08
 
@@ -41,7 +55,7 @@ adheres to [Semantic Versioning](https://semver.org/).
   together. Removed the fixed MIDI CC table — mappings are configured
   entirely in Settings → MIDI mapping via LEARN.
 
-[1.1.1]: https://github.com/USERNAME/laser-laser-laser/releases/tag/v1.1.1
+[1.1.1]: https://github.com/edmonkey-nz/laser-laser-laser/releases/tag/v1.1.1
 
 ## [1.1.0] — 2026-07-08
 
@@ -55,7 +69,7 @@ adheres to [Semantic Versioning](https://semver.org/).
   back to the system settings. Saved and restored with the pattern,
   excluded from the random generator, and not MIDI-mapped.
 
-[1.1.0]: https://github.com/USERNAME/laser-laser-laser/releases/tag/v1.1.0
+[1.1.0]: https://github.com/edmonkey-nz/laser-laser-laser/releases/tag/v1.1.0
 
 ## [1.0.0] — 2026-07-06
 
@@ -91,4 +105,4 @@ the Helios DAC, controllable from a browser, MIDI, and the keyboard.
 - Persistent settings, projector orientation flips, and an editable
   About page.
 
-[1.0.0]: https://github.com/USERNAME/laser-laser-laser/releases/tag/v1.0.0
+[1.0.0]: https://github.com/edmonkey-nz/laser-laser-laser/releases/tag/v1.0.0

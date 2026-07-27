@@ -1,0 +1,139 @@
+# Builds standalone executables for Ubuntu, Windows and macOS with
+# PyInstaller (see pyinstaller.spec) and, when triggered by a version
+# tag, publishes them as a GitHub Release.
+#
+# Trigger it either by:
+#   git tag v1.3.0 && git push origin v1.3.0     (builds + publishes a release)
+#   Actions tab -> "Build executables" -> Run workflow   (builds only, no release)
+#
+# Each OS produces one zip containing a folder ("--onedir" mode): the
+# executable plus everything it needs (Python runtime, static/, the
+# Helios DAC shared library, a starter patterns.json, etc). Unzip and
+# run — no install step, no separate Python needed on the target machine.
+name: Build executables
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            asset_os: linux-x86_64
+          - os: windows-latest
+            asset_os: windows-x86_64
+          - os: macos-latest        # Apple Silicon (arm64) runner
+            asset_os: macos-arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller opencv-python-headless
+
+      - name: Determine version string
+        id: ver
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=dev" >> "$GITHUB_OUTPUT"
+          fi
+
+      # --- Helios DAC shared library, staged per OS -----------------------
+      # Linux: pyinstaller.spec bundles the .so already committed in the
+      # repo (libHeliosDacAPI.so), so there's nothing to fetch here.
+      #
+      # Windows/macOS: the Helios SDK repo ships prebuilt libraries we can
+      # use as-is instead of compiling from source. helios.py expects
+      # specific filenames per OS (see helios.py's _lib_path()), so they're
+      # renamed on the way in.
+
+      - name: Stage Helios library (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          mkdir -p helios_lib
+          curl -sL -o helios_lib/HeliosLaserDAC.dll \
+            https://raw.githubusercontent.com/Grix/helios_dac/master/sdk/cpp/shared_library/HeliosLaserDAC.dll
+          curl -sL -o helios_lib/libusb-1.0.dll \
+            https://raw.githubusercontent.com/Grix/helios_dac/master/sdk/cpp/libusb_bin/Windows/x64/Release/dll/libusb-1.0.dll
+
+      - name: Stage Helios library (macOS)
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          mkdir -p helios_lib
+          curl -sL -o helios_lib/libHeliosDacAPI.dylib \
+            https://raw.githubusercontent.com/Grix/helios_dac/master/sdk/cpp/shared_library/libHeliosLaserDAC.dylib
+          curl -sL -o helios_lib/libusb-1.0.0.dylib \
+            https://raw.githubusercontent.com/Grix/helios_dac/master/sdk/cpp/libusb_bin/macOS/libusb-1.0.0.dylib
+          # The dylib looks up libusb via @rpath but ships with no rpath
+          # entry pointing anywhere useful. Add one that means "wherever
+          # this library itself lives" so the copy fetched above resolves
+          # at load time. This is the SDK's own fix — see
+          # sdk/cpp/shared_library/xcode/rpath_command.sh in that repo.
+          install_name_tool -add_rpath @loader_path helios_lib/libHeliosDacAPI.dylib
+
+      - name: Build with PyInstaller
+        shell: bash
+        run: pyinstaller --noconfirm pyinstaller.spec
+
+      - name: Add udev rule (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: cp heliosdac.rules dist/laser-laser-laser/
+
+      - name: Package (Linux/macOS)
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        run: |
+          cd dist
+          zip -r -9 "../laser-laser-laser-${{ steps.ver.outputs.version }}-${{ matrix.asset_os }}.zip" laser-laser-laser
+
+      - name: Package (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist/laser-laser-laser `
+            -DestinationPath "laser-laser-laser-${{ steps.ver.outputs.version }}-${{ matrix.asset_os }}.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: laser-laser-laser-${{ matrix.asset_os }}
+          path: laser-laser-laser-*.zip
+          if-no-files-found: error
+
+  # Only runs on a tag push (workflow_dispatch has no tag, so no release).
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*.zip
+          generate_release_notes: true

@@ -23,6 +23,7 @@ Client → server (JSON):
   {"type":"pattern_learn","name":"triad"}    (next MIDI note binds; resend to cancel)
   {"type":"pattern_unbind","name":"triad"}
   {"type":"ilda_select","name":"star.ild"}   (loads file, switches to ilda shape)
+  {"type":"custom_points_set","points":[[x,y],...]}  (switches to custom shape)
   {"type":"geom_corners","corners":[8 floats]} {"type":"geom_pincushion","value":0.3}
   {"type":"geom_test","value":true} {"type":"geom_reset"}
 POST /upload_ilda (raw body + X-Filename header) adds a file to the library.
@@ -184,6 +185,7 @@ class WebUI:
                         "ilda_file": self.engine.ilda_name,
                         "text": self.engine.text_str,
                         "text_style": self.engine.text_style,
+                        "custom_points": self.engine.custom_points,
                         "override": {
                             "pps": self.engine.pattern_pps,
                             "points": self.engine.pattern_points,
@@ -284,6 +286,7 @@ class WebUI:
                     "text_style": self.engine.text_style,
                     "pps": self.engine.pattern_pps,
                     "points": self.engine.pattern_points,
+                    "custom_points": self.engine.custom_points or None,
                 })
         elif t == "pattern_load":
             self.bank.apply_entry(msg.get("name", ""), self.engine,
@@ -302,6 +305,12 @@ class WebUI:
                                  int(msg.get("style", 0)))
             from shapes import SHAPE_NAMES as _SN
             self.engine.set_param("shape", _SN.index("text"))
+        elif t == "custom_points_set":
+            pts = msg.get("points", [])
+            if isinstance(pts, list):
+                self.engine.set_custom_points(pts)
+                from shapes import SHAPE_NAMES as _SN
+                self.engine.set_param("shape", _SN.index("custom"))
         elif t == "pattern_override":
             # per-pattern PPS/points; empty/null clears back to system
             v = msg.get("pps")

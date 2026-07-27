@@ -11,7 +11,9 @@ import numpy as np
 TWO_PI = 2.0 * np.pi
 
 SHAPE_NAMES = ["lissajous", "rose", "hypotrochoid", "wave", "harmonograph",
-               "polygon", "scope", "ilda", "vector", "text"]
+               "polygon", "scope", "ilda", "vector", "text", "custom"]
+
+MAX_CUSTOM_POINTS = 64
 
 
 def polygon(n, phase, p):
@@ -50,6 +52,27 @@ def polygon(n, phase, p):
         theta = np.arctan2(y, x)
         x = (1 - r) * x + r * np.cos(theta)
         y = (1 - r) * y + r * np.sin(theta)
+    return x, y
+
+
+def custom_polygon(n, phase, points):
+    """User-clicked polygon: straight edges connecting the given points in
+    click order, closed back to the first point. points is a list of
+    (x, y) pairs in [-1, 1]. Resampled to n points at equal arc length,
+    same as the regular `polygon` shape, so beam brightness stays even."""
+    if not points or len(points) < 2:
+        t = np.linspace(0, TWO_PI, n, endpoint=False)
+        return 0.15 * np.cos(t), 0.15 * np.sin(t)
+    pts = np.asarray(points, dtype=float)
+    pts = np.vstack([pts, pts[:1]])          # close the loop
+    vx, vy = pts[:, 0], pts[:, 1]
+    seg = np.hypot(np.diff(vx), np.diff(vy))
+    cum = np.concatenate([[0.0], np.cumsum(seg)])
+    if cum[-1] < 1e-9:
+        return np.full(n, vx[0]), np.full(n, vy[0])
+    s = np.linspace(0, cum[-1], n, endpoint=False)
+    x = np.interp(s, cum, vx)
+    y = np.interp(s, cum, vy)
     return x, y
 
 
@@ -297,6 +320,7 @@ class ShapeEngine:
         self.text_str = ""        # current text-shape string
         self.text_style = 0       # 0 plain, 1 script, 2 bold
         self.text_frame = None    # cached rendered text frame
+        self.custom_points = []   # user-clicked polygon points [[x,y], ...]
         # per-pattern PPS/points overrides (None = use system settings)
         self.pattern_pps = None
         self.pattern_points = None
@@ -318,7 +342,7 @@ class ShapeEngine:
         import random as _r
         # shapes minus ilda/vector/scope (scope needs audio to be interesting)
         pickable = [s for s in SHAPE_NAMES
-                    if s not in ("ilda", "vector", "scope")]
+                    if s not in ("ilda", "vector", "scope", "custom")]
         shape_idx = SHAPE_NAMES.index(_r.choice(pickable))
         p = {
             "shape": float(shape_idx),
@@ -458,6 +482,17 @@ class ShapeEngine:
                                       STYLES[self.text_style],
                                       self.n_points)
 
+    def set_custom_points(self, points):
+        """Install a user-clicked point list (list of [x, y] pairs, each
+        -1..1). Capped so a runaway click session can't bloat the pattern
+        file or the per-frame resample cost."""
+        clean = []
+        for pt in points[:MAX_CUSTOM_POINTS]:
+            x, y = pt
+            clean.append([float(np.clip(x, -1.0, 1.0)),
+                          float(np.clip(y, -1.0, 1.0))])
+        self.custom_points = clean
+
     def set_ilda(self, frames, name):
         """Install a parsed ILDA file as the playback source."""
         self.ilda_pos = 0.0
@@ -588,6 +623,8 @@ class ShapeEngine:
                 x, y, src_rgb, src_lit = self._resample_src(fr, n)
         elif name == "scope":
             x, y = scope(n, self.phase, p_mod, audio)
+        elif name == "custom":
+            x, y = custom_polygon(n, self.phase, self.custom_points)
         else:
             fn = {"lissajous": lissajous, "rose": rose,
                   "hypotrochoid": hypotrochoid, "wave": wave,

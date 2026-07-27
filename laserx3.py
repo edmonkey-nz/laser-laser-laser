@@ -25,7 +25,7 @@ Default MIDI CC map (channel-agnostic):
   Notes from C1 (36) upward select shapes.
 """
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 import argparse
 import sys

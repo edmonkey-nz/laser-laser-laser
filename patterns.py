@@ -49,8 +49,9 @@ class PatternBank:
                 "midi_note": note,
                 "ilda_file": ilda_file or None,
             }
-            # optional extras: text, text_style, pps, points (any may be None)
-            for k in ("text", "text_style", "pps", "points"):
+            # optional extras: text, text_style, pps, points, custom_points
+            # (any may be None)
+            for k in ("text", "text_style", "pps", "points", "custom_points"):
                 v = (extra or {}).get(k)
                 if v is not None and v != "":
                     entry[k] = v
@@ -115,6 +116,9 @@ class PatternBank:
         # text (only if the pattern carried it)
         if "text" in entry:
             engine.set_text(entry["text"], entry.get("text_style", 0))
+        # custom polygon points (only if the pattern carried them)
+        if "custom_points" in entry:
+            engine.set_custom_points(entry["custom_points"])
         # per-pattern PPS/points overrides (None clears back to system)
         engine.pattern_pps = entry.get("pps")
         engine.pattern_points = entry.get("points")

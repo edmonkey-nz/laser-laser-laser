@@ -98,6 +98,14 @@
   .geom-wrap { display: flex; justify-content: center; margin: .5rem 0; }
   #geom-canvas { background: #000; border: 1px solid var(--panel-edge);
     border-radius: 4px; touch-action: none; cursor: grab; }
+  #custom-modal[hidden] { display: none; }
+  #custom-modal {
+    position: fixed; inset: 0; z-index: 20; display: flex;
+    align-items: center; justify-content: center;
+    background: rgba(4,6,10,.75);
+  }
+  #custom-canvas { background: #000; border: 1px solid var(--panel-edge);
+    border-radius: 4px; touch-action: none; cursor: crosshair; }
   #status { margin-left: auto; color: var(--ink-dim); font-size: .78rem; letter-spacing: .05em; margin-right: .6rem; }
   .mdot { display: inline-block; width: .55em; height: .55em;
           border-radius: 50%; background: var(--track);
@@ -464,6 +472,13 @@
         <div class="map-hint" style="margin:0">cycles = ratio A · amplitude/duty = morph</div>
       </div>
       <div class="panel">
+        <h2>Custom Shape</h2>
+        <div class="ilda-row">
+          <button id="custom-edit" style="flex:1">EDIT POINTS…</button>
+        </div>
+        <div class="ilda-status" id="custom-hint">0 points saved</div>
+      </div>
+      <div class="panel">
         <h2>Vectoriser</h2>
         <div class="ilda-row">
           <select id="vec-cam"><option value="">source: off</option></select>
@@ -560,6 +575,34 @@
     <div class="map-hint">LEARN, then move a knob on your controller.
       Highlighted CC numbers are custom; × returns a row to its default.</div>
     <table id="map-table"></table>
+  </div>
+</div>
+
+<div id="custom-modal" hidden>
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2>Custom Shape</h2>
+      <button id="custom-close">CLOSE</button>
+    </div>
+    <div class="map-hint">ADD: click empty space to add a point. SELECT:
+      click a point to select it, drag to move. DELETE: click a point to
+      remove it. Points connect in click order, closing back to the first.</div>
+    <div class="geom-wrap">
+      <canvas id="custom-canvas" width="400" height="400"></canvas>
+    </div>
+    <div class="toggles" id="custom-mode">
+      <button data-m="add" class="active">ADD</button>
+      <button data-m="select">SELECT</button>
+      <button data-m="delete">DELETE</button>
+    </div>
+    <div class="toggles">
+      <button id="custom-undo">UNDO LAST</button>
+      <button id="custom-clear">CLEAR ALL</button>
+    </div>
+    <div class="bank-row" style="margin-top:.8rem">
+      <span class="ilda-status" id="custom-count" style="flex:1">0 points</span>
+      <button id="custom-apply">USE SHAPE</button>
+    </div>
   </div>
 </div>
 
@@ -921,6 +964,136 @@ document.getElementById("text-macron").addEventListener("click", () => {
   sendText();
 });
 
+/* ---------------- custom polygon shape ---------------- */
+const MAX_CUSTOM_POINTS = 64;
+const customModal = document.getElementById("custom-modal");
+const customCanvas = document.getElementById("custom-canvas");
+const cctx = customCanvas.getContext("2d");
+const CW = customCanvas.width, CPAD = 20;
+let customPoints = [];    // last points known from server state
+let editPoints = [];      // working copy while the modal is open
+let customMode = "add";
+let customSelected = -1;
+let customDragging = false;
+
+function customToCanvas([x, y]) {
+  const span = CW - 2 * CPAD;
+  return [CPAD + (x + 1) / 2 * span, CPAD + (1 - y) / 2 * span];
+}
+function customFromCanvas(px, py) {
+  const span = CW - 2 * CPAD;
+  return [Math.max(-1, Math.min(1, (px - CPAD) / span * 2 - 1)),
+          Math.max(-1, Math.min(1, 1 - (py - CPAD) / span * 2))];
+}
+function customHitTest(px, py) {
+  for (let i = 0; i < editPoints.length; i++) {
+    const [x, y] = customToCanvas(editPoints[i]);
+    if (Math.hypot(px - x, py - y) < 10) return i;
+  }
+  return -1;
+}
+function drawCustom() {
+  cctx.clearRect(0, 0, CW, CW);
+  cctx.strokeStyle = "#2a3344"; cctx.lineWidth = 1;
+  cctx.strokeRect(CPAD, CPAD, CW - 2 * CPAD, CW - 2 * CPAD);
+  cctx.beginPath();
+  cctx.moveTo(CW / 2, CPAD); cctx.lineTo(CW / 2, CW - CPAD);
+  cctx.moveTo(CPAD, CW / 2); cctx.lineTo(CW - CPAD, CW / 2);
+  cctx.strokeStyle = "#1c2230"; cctx.stroke();
+
+  if (editPoints.length) {
+    const px = editPoints.map(customToCanvas);
+    cctx.strokeStyle = "#d8e6f2"; cctx.lineWidth = 1.5;
+    cctx.beginPath();
+    cctx.moveTo(px[0][0], px[0][1]);
+    for (let i = 1; i < px.length; i++) cctx.lineTo(px[i][0], px[i][1]);
+    if (px.length > 2) {
+      cctx.setLineDash([4, 4]);
+      cctx.lineTo(px[0][0], px[0][1]);
+      cctx.setLineDash([]);
+    }
+    cctx.stroke();
+    px.forEach(([x, y], i) => {
+      cctx.beginPath();
+      cctx.arc(x, y, 6, 0, 7);
+      cctx.fillStyle = i === customSelected ? "#d8e6f2" : "#4ade80";
+      cctx.fill();
+      cctx.fillStyle = "#0a0c11"; cctx.font = "9px monospace";
+      cctx.textAlign = "center"; cctx.textBaseline = "middle";
+      cctx.fillText(String(i + 1), x, y);
+    });
+  }
+  document.getElementById("custom-count").textContent =
+    editPoints.length + " point" + (editPoints.length === 1 ? "" : "s");
+}
+function customEventPos(e) {
+  const r = customCanvas.getBoundingClientRect();
+  const t = e.touches ? e.touches[0] : e;
+  return [t.clientX - r.left, t.clientY - r.top];
+}
+customCanvas.addEventListener("pointerdown", (e) => {
+  const [px, py] = customEventPos(e);
+  const hit = customHitTest(px, py);
+  if (customMode === "delete") {
+    if (hit >= 0) { editPoints.splice(hit, 1); customSelected = -1; drawCustom(); }
+    return;
+  }
+  if (customMode === "select") {
+    if (hit >= 0) {
+      customSelected = hit; customDragging = true;
+      customCanvas.setPointerCapture(e.pointerId);
+    } else customSelected = -1;
+    drawCustom();
+    return;
+  }
+  // add mode: clicking an existing point just selects it
+  if (hit >= 0) { customSelected = hit; drawCustom(); return; }
+  if (editPoints.length >= MAX_CUSTOM_POINTS) return;
+  editPoints.push(customFromCanvas(px, py));
+  customSelected = editPoints.length - 1;
+  drawCustom();
+});
+customCanvas.addEventListener("pointermove", (e) => {
+  if (!customDragging || customSelected < 0) return;
+  const [px, py] = customEventPos(e);
+  editPoints[customSelected] = customFromCanvas(px, py);
+  drawCustom();
+});
+function customEndDrag() { customDragging = false; }
+customCanvas.addEventListener("pointerup", customEndDrag);
+customCanvas.addEventListener("pointercancel", customEndDrag);
+
+const customModeBtns = Array.from(document.querySelectorAll("#custom-mode button"));
+for (const b of customModeBtns) {
+  b.addEventListener("click", () => {
+    customMode = b.dataset.m;
+    customModeBtns.forEach(x => x.classList.toggle("active", x === b));
+  });
+}
+document.getElementById("custom-undo").addEventListener("click", () => {
+  editPoints.pop(); customSelected = -1; drawCustom();
+});
+document.getElementById("custom-clear").addEventListener("click", () => {
+  editPoints = []; customSelected = -1; drawCustom();
+});
+document.getElementById("custom-edit").addEventListener("click", () => {
+  editPoints = customPoints.map(p => p.slice());
+  customSelected = -1;
+  customMode = "add";
+  customModeBtns.forEach(x => x.classList.toggle("active", x.dataset.m === "add"));
+  customModal.hidden = false;
+  drawCustom();
+});
+document.getElementById("custom-close").addEventListener("click", () =>
+  customModal.hidden = true);
+customModal.addEventListener("click", (e) => {
+  if (e.target === customModal) customModal.hidden = true;
+});
+document.getElementById("custom-apply").addEventListener("click", () => {
+  send({ type: "custom_points_set", points: editPoints });
+  customModal.hidden = true;
+});
+
 /* ---------------- per-pattern PPS/points override ---------------- */
 const ovrPps = document.getElementById("ovr-pps");
 const ovrPoints = document.getElementById("ovr-points");
@@ -1047,7 +1220,9 @@ document.getElementById("close-settings").addEventListener("click", () =>
   modal.hidden = true);
 modal.addEventListener("click", (e) => { if (e.target === modal) modal.hidden = true; });
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") { modal.hidden = true; aboutModal.hidden = true; }
+  if (e.key === "Escape") {
+    modal.hidden = true; aboutModal.hidden = true; customModal.hidden = true;
+  }
 });
 
 const MAPPABLE = [];
@@ -1296,6 +1471,9 @@ function onState(s) {
     for (const b of textStylesEl.querySelectorAll("button"))
       b.classList.toggle("active", parseInt(b.dataset.s,10) === textStyle);
   }
+  customPoints = s.custom_points || [];
+  document.getElementById("custom-hint").textContent =
+    customPoints.length + " point" + (customPoints.length === 1 ? "" : "s") + " saved";
   // per-pattern override fields (don't clobber while editing)
   const ov = s.override || {};
   if (document.activeElement !== ovrPps)
