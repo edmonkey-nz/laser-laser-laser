@@ -71,27 +71,35 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: bash
         run: |
+          set -euxo pipefail
           mkdir -p helios_lib
-          curl -sL -o helios_lib/HeliosLaserDAC.dll \
+          curl -fSL -o helios_lib/HeliosLaserDAC.dll \
             https://raw.githubusercontent.com/Grix/helios_dac/master/sdk/cpp/shared_library/HeliosLaserDAC.dll
-          curl -sL -o helios_lib/libusb-1.0.dll \
+          curl -fSL -o helios_lib/libusb-1.0.dll \
             https://raw.githubusercontent.com/Grix/helios_dac/master/sdk/cpp/libusb_bin/Windows/x64/Release/dll/libusb-1.0.dll
+          ls -l helios_lib/
 
       - name: Stage Helios library (macOS)
         if: matrix.os == 'macos-latest'
         shell: bash
         run: |
+          set -euxo pipefail
           mkdir -p helios_lib
-          curl -sL -o helios_lib/libHeliosDacAPI.dylib \
+          curl -fSL -o helios_lib/libHeliosDacAPI.dylib \
             https://raw.githubusercontent.com/Grix/helios_dac/master/sdk/cpp/shared_library/libHeliosLaserDAC.dylib
-          curl -sL -o helios_lib/libusb-1.0.0.dylib \
+          curl -fSL -o helios_lib/libusb-1.0.0.dylib \
             https://raw.githubusercontent.com/Grix/helios_dac/master/sdk/cpp/libusb_bin/macOS/libusb-1.0.0.dylib
-          # The dylib looks up libusb via @rpath but ships with no rpath
-          # entry pointing anywhere useful. Add one that means "wherever
-          # this library itself lives" so the copy fetched above resolves
-          # at load time. This is the SDK's own fix — see
-          # sdk/cpp/shared_library/xcode/rpath_command.sh in that repo.
-          install_name_tool -add_rpath @loader_path helios_lib/libHeliosDacAPI.dylib
+          file helios_lib/libHeliosDacAPI.dylib helios_lib/libusb-1.0.0.dylib
+          # The dylib depends on @rpath/libusb-1.0.0.dylib but ships with no
+          # rpath entry pointing anywhere useful. Retarget that dependency
+          # to "wherever this library itself lives" (@loader_path) so the
+          # copy fetched above resolves at load time. Verified against the
+          # actual load-command string in the binary (see otool -L output
+          # below); more reliable than `install_name_tool -add_rpath`,
+          # which errors out if an @loader_path rpath entry already exists.
+          install_name_tool -change @rpath/libusb-1.0.0.dylib \
+            @loader_path/libusb-1.0.0.dylib helios_lib/libHeliosDacAPI.dylib
+          otool -L helios_lib/libHeliosDacAPI.dylib
 
       - name: Build with PyInstaller
         shell: bash
