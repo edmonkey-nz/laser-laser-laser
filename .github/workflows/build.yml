@@ -105,10 +105,8 @@ jobs:
         shell: bash
         run: pyinstaller --noconfirm pyinstaller.spec
 
-      - name: Add udev rule (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        shell: bash
-        run: cp heliosdac.rules dist/laser-laser-laser/
+      # (the Linux udev rule is bundled by pyinstaller.spec, so local and CI
+      # builds produce the same folder — no copy step needed here)
 
       - name: Package (Linux/macOS)
         if: matrix.os != 'windows-latest'

@@ -3,6 +3,49 @@
 All notable changes to this project are documented here. This project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.4.0] — 2026-08-14
+
+### Added
+- **Output monitor window**: a MONITOR button in the header opens the beam
+  view in its own window — no panels, no chrome, just the output on black,
+  scaled to fill and letterboxed to the square scan field. Drag it to a
+  second screen or projector and double-click for fullscreen. It reads the
+  same 30 Hz frame stream as the control surface (so it shows exactly what
+  the laser is doing, mask included) and reconnects on its own if the synth
+  restarts. Served at `/monitor`; useful as a stand-in display when you
+  don't have a laser to hand.
+- **Mask**: draw polygons over the live beam and everything outside them
+  is blanked — on the laser **and** the monitor, unlike projection
+  geometry, which is laser-only. Click points straight onto the scope;
+  select/drag, delete and undo as you go, with the shape updating the
+  output live. A mask holds up to 8 polygons (64 points each) and inside
+  means inside any of them; INVERT flips it to block-inside, so you can
+  cut windows out of a full field. Masks save to a named library
+  (`masks.json`) and reload with a click, independent of the pattern bank
+  — the mask is about the room, not the visual. The live mask persists in
+  `settings.json` across restarts. Applied before the geometry warp, so it
+  is defined in the same space the monitor shows. Blanking only: the beam
+  still travels masked areas dark, so it is a projection-mapping tool, not
+  a safety interlock.
+
+### Changed
+- **Text and Mask panels collapse**: both start collapsed as slim headers,
+  since they're occasional-use — click a header to open. Hitting the
+  **text** shape button opens the Text panel and focuses the box, so
+  picking the shape and typing is still one move.
+- **Docs split**: the README is now a short landing page; per-platform
+  setup and the command-line reference moved to `docs/INSTALL.md`, and the
+  full control reference to `docs/MANUAL.md`. Added `CLAUDE.md` for
+  AI-assisted work on the codebase.
+- **Tidier root**: documentation, the interface snapshot and the app icon
+  moved to `docs/`; `heliosdac.rules` and `build_helios_lib.sh` to
+  `scripts/` (the udev-rule install command in `docs/INSTALL.md` changed to
+  match). The Python modules and their data files stay flat in the root on
+  purpose — several resolve paths relative to their own file, and the
+  PyInstaller bundle flattens to the same layout.
+
+[1.4.0]: https://github.com/edmonkey-nz/laser-laser-laser/releases/tag/v1.4.0
+
 ## [1.3.1] — 2026-07-27
 
 ### Fixed

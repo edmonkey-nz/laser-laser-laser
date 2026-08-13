@@ -12,6 +12,9 @@ env/
 settings.json
 settings.json.tmp
 patterns.json.tmp
+# masks are venue-specific — yours shouldn't follow the repo around
+masks.json
+masks.json.tmp
 
 # User-uploaded ILDA files (keep the sample, ignore the rest)
 ilda/*.ild

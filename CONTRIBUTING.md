@@ -19,7 +19,7 @@ hope it's useful to other laser/synth tinkerers.
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python laserx3.py --web        # screen only, no laser
+python laserx3.py              # screen only, no laser (browser UI always on)
 ```
 
 The architecture, in brief:

@@ -26,6 +26,10 @@ Client → server (JSON):
   {"type":"custom_points_set","points":[[x,y],...]}  (switches to custom shape)
   {"type":"geom_corners","corners":[8 floats]} {"type":"geom_pincushion","value":0.3}
   {"type":"geom_test","value":true} {"type":"geom_reset"}
+  {"type":"mask_set","polys":[[[x,y],...],...],"invert":false}  (live mask edit)
+  {"type":"mask_enable","value":true}
+  {"type":"mask_save","name":"back wall"} {"type":"mask_load","name":"back wall"}
+  {"type":"mask_delete","name":"back wall"}
 POST /upload_ilda (raw body + X-Filename header) adds a file to the library.
 POST /upload_image (raw body) loads an image into the vectoriser.
   {"type":"vec_source","mode":"camera","device":0} | {"mode":"image"} | {"mode":"off"}
@@ -41,6 +45,8 @@ import time
 from shapes import SHAPE_NAMES
 import vectorise
 from geometry import GeometryCorrection, test_pattern
+from mask import MaskFilter
+from masks import MaskBank
 from settings import SettingsStore
 from ilda import IldaLibrary
 from patterns import PatternBank
@@ -51,7 +57,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 class WebUI:
     def __init__(self, engine, port=8080, host="0.0.0.0", downsample=2,
                  bank=None, ilda_lib=None, vec=None, settings=None,
-                 midi=None, geom=None):
+                 midi=None, geom=None, mask=None, mask_bank=None):
         self.engine = engine
         self.port = port
         self.host = host
@@ -64,6 +70,9 @@ class WebUI:
             os.path.join(HERE, "settings.json"))
         self.midi = midi
         self.geom = geom or GeometryCorrection()
+        self.mask = mask or MaskFilter()
+        self.mask_bank = mask_bank or MaskBank(
+            os.path.join(HERE, "masks.json"))
         self._midi_ports = []
         self._midi_ports_t = 0.0
         self._latest = None          # packed frame bytes
@@ -101,6 +110,12 @@ class WebUI:
 
         async def index(request):
             return web.FileResponse(os.path.join(HERE, "static", "index.html"))
+
+        async def monitor(request):
+            """Chrome-free beam view for a second screen — reads the same
+            binary frame stream as the control surface."""
+            return web.FileResponse(
+                os.path.join(HERE, "static", "monitor.html"))
 
         async def about(request):
             path = os.path.join(HERE, "about.md")
@@ -173,6 +188,13 @@ class WebUI:
                             "corners": list(self.geom.corners),
                             "pincushion": self.geom.pincushion,
                             "test": self.engine.test_frame is not None,
+                        },
+                        "mask": {
+                            "on": self.mask.enabled,
+                            "invert": self.mask.invert,
+                            "polys": self.mask.polys,
+                            "name": self.mask.name,
+                            "saved": self.mask_bank.names(),
                         },
                         "settings": {
                             "points": self.engine.n_points,
@@ -250,6 +272,7 @@ class WebUI:
         app = web.Application(client_max_size=25 * 1024 * 1024)
         app.router.add_post("/upload_image", upload_image)
         app.router.add_get("/", index)
+        app.router.add_get("/monitor", monitor)
         app.router.add_get("/about", about)
         app.router.add_get("/ws", ws_handler)
         app.router.add_post("/upload_ilda", upload_ilda)
@@ -262,6 +285,11 @@ class WebUI:
         print(f"[web] control surface at http://laserx3:{self.port} "
               f"(or http://localhost:{self.port}; reachable on your LAN too)")
         self._loop.run_forever()
+
+    def _save_mask_state(self):
+        """Persist the live mask so it survives a restart (same treatment
+        the geometry corners get)."""
+        self.settings.set("mask", self.mask.state())
 
     def _apply(self, msg):
         p = self.engine.p
@@ -358,6 +386,32 @@ class WebUI:
             self.geom.reset()
             self.settings.set("corners", [0.0] * 8)
             self.settings.set("pincushion", 0.0)
+        elif t == "mask_set":
+            polys = msg.get("polys", [])
+            if isinstance(polys, list):
+                self.mask.set_polys(polys, msg.get("invert"))
+                self.mask.name = None   # hand-edited: no longer a saved mask
+                self._save_mask_state()
+        elif t == "mask_enable":
+            self.mask.enabled = bool(msg.get("value"))
+            self._save_mask_state()
+        elif t == "mask_save":
+            name = msg.get("name", "")
+            if self.mask_bank.save(name, self.mask.polys, self.mask.invert):
+                self.mask.name = str(name).strip()[:32]
+                self._save_mask_state()
+        elif t == "mask_load":
+            name = msg.get("name", "")
+            entry = self.mask_bank.entry(name)
+            if entry:
+                self.mask.set_polys(entry["polys"], entry.get("invert", False))
+                self.mask.name = name
+                self._save_mask_state()
+        elif t == "mask_delete":
+            name = msg.get("name", "")
+            if self.mask_bank.delete(name) and self.mask.name == name:
+                self.mask.name = None
+                self._save_mask_state()
         elif t == "geom_test":
             self.engine.test_frame = test_pattern(self.engine.n_points)                 if msg.get("value") else None
         elif t == "setting":

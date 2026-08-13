@@ -25,7 +25,7 @@ Default MIDI CC map (channel-agnostic):
   Notes from C1 (36) upward select shapes.
 """
 
-__version__ = "1.3.1"
+__version__ = "1.4.0"
 
 import argparse
 import sys
@@ -36,6 +36,8 @@ import numpy as np
 
 from ilda import IldaLibrary
 from geometry import GeometryCorrection, test_pattern
+from mask import MaskFilter
+from masks import MaskBank
 from settings import SettingsStore
 from vectorise import VectorSource
 from patterns import PatternBank
@@ -521,6 +523,8 @@ def main():
     ilda_lib = IldaLibrary(_os.path.join(_here, "ilda"))
     vec = VectorSource(engine)
     geom = GeometryCorrection()
+    mask = MaskFilter()
+    mask_bank = MaskBank(_os.path.join(_here, "masks.json"))
     settings = SettingsStore(_os.path.join(_here, "settings.json"))
     # saved settings win over CLI defaults; CLI seeds first run
     engine.pps = int(settings.get("pps", args.pps))
@@ -530,6 +534,7 @@ def main():
     engine.xfade_time = float(settings.get("xfade_time", 2.0))
     geom.set_corners(settings.get("corners", [0.0] * 8))
     geom.set_pincushion(float(settings.get("pincushion", 0.0)))
+    mask.restore(settings.get("mask", {}))
     midi = MidiInput(engine, args.midi, bank=bank, ilda_lib=ilda_lib,
                      settings=settings)
     engine.on_load = midi._caught.clear   # re-arm soft takeover on any load
@@ -540,7 +545,7 @@ def main():
         from webui import WebUI
         web = WebUI(engine, port=args.web_port, bank=bank,
                     ilda_lib=ilda_lib, vec=vec, settings=settings,
-                    midi=midi, geom=geom)
+                    midi=midi, geom=geom, mask=mask, mask_bank=mask_bank)
 
     dac = None
     if args.laser:
@@ -575,6 +580,9 @@ def main():
             frame = engine.frame(dt, a)
             if engine.blanked:
                 frame[:, 2:6] = 0
+            # masking happens before the preview/web/DAC split so all three
+            # agree — unlike hw_orient/geom, which are DAC-only
+            frame = mask.apply(frame)
             fps_ema = 0.9 * fps_ema + 0.1 * (1.0 / max(dt, 1e-6))
 
             if preview:

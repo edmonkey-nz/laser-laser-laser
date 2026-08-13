@@ -2,8 +2,14 @@
 """
 PyInstaller spec for Laser! Laser Laser! — builds a --onedir bundle (a
 folder, not a single exe) so patterns.json / settings.json / ilda/ stay
-real, writable files next to the app, exactly like running from source.
-See the README's "Building executables" section for the full story.
+real, writable files you can hand-edit, exactly like running from source.
+See docs/INSTALL.md for the full story.
+
+Note: since PyInstaller 6 those files live in the bundle's `_internal/`
+subfolder rather than beside the executable (COLLECT's contents_directory
+default changed). The app finds them either way — every module resolves
+data relative to its own __file__ — but a user hand-editing patterns.json
+has to look in `_internal/`.
 
 Used both by .github/workflows/build.yml (one job per OS) and for a
 local build:  pyinstaller pyinstaller.spec
@@ -12,6 +18,7 @@ Expects the platform Helios shared library staged in helios_lib/ before
 running (see build.yml for exactly what goes there per OS). On Linux the
 repo's own libHeliosDacAPI.so is used directly — no staging needed.
 """
+import os
 import sys
 
 datas = [
@@ -64,3 +71,13 @@ coll = COLLECT(
     upx=False,
     name="laser-laser-laser",
 )
+
+# The Linux udev rule has to sit at the TOP level of the unzipped folder,
+# not in _internal/ where `datas` would put it — a user is told to run
+# `sudo cp heliosdac.rules ...` from the folder they just unzipped, so it
+# has to be the first thing they see. Done here rather than as a CI step so
+# a local `pyinstaller pyinstaller.spec` produces the same folder.
+if sys.platform not in ("win32", "darwin"):
+    import shutil
+    shutil.copy("scripts/heliosdac.rules",
+                os.path.join(DISTPATH, "laser-laser-laser"))

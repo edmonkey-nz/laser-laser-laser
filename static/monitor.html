@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Laser Monitor</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: #000; overflow: hidden; }
+  body {
+    display: flex; align-items: center; justify-content: center;
+    font: 13px/1.4 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    color: #7c8798; cursor: none;
+  }
+  body.idle-ui #hint { opacity: 0; }
+  /* the scan field is square — letterbox to the shorter side */
+  #wrap { position: relative; aspect-ratio: 1; height: 100%; max-width: 100%; }
+  canvas { display: block; width: 100%; height: 100%; }
+  #veil {
+    position: absolute; inset: 0; display: none;
+    align-items: center; justify-content: center;
+    background: rgba(0,0,0,.85); color: #ff5555;
+    letter-spacing: .3em; font-size: 1rem;
+  }
+  #wrap.blanked #veil { display: flex; }
+  #hint {
+    position: fixed; inset: auto auto 1rem 1rem; font-size: .7rem;
+    letter-spacing: .08em; transition: opacity .6s; pointer-events: none;
+  }
+  #conn { position: fixed; inset: auto 1rem 1rem auto; font-size: .7rem; }
+  #conn.lost { color: #ff5555; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="scope" width="800" height="800"></canvas>
+  <div id="veil">BLANKED</div>
+</div>
+<div id="hint">double-click for fullscreen</div>
+<div id="conn"></div>
+
+<script>
+"use strict";
+
+/* Output monitor: a clean, chrome-free view of the beam for a second
+   screen or projector. Reads the same 30 Hz binary frame stream as the
+   control surface — no JSON state needed, since the frame header carries
+   the blanked flag. Points arrive already masked (the mask is applied
+   server-side to the shared frame), so what shows here is what the laser
+   is doing. The mask outline is deliberately not drawn: it's an editing
+   aid, and this is meant to be a clean feed. */
+
+const canvas = document.getElementById("scope");
+const ctx = canvas.getContext("2d");
+const wrap = document.getElementById("wrap");
+const connEl = document.getElementById("conn");
+
+/* Match the canvas backing store to its displayed size so the beam stays
+   crisp on a big screen instead of upscaling an 800px buffer. */
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const side = Math.round(wrap.clientHeight * dpr);
+  if (side > 0 && canvas.width !== side) {
+    canvas.width = side;
+    canvas.height = side;
+  }
+}
+window.addEventListener("resize", resize);
+resize();
+
+function onFrame(buf) {
+  const dv = new DataView(buf);
+  const n = dv.getUint16(0, true);
+  wrap.classList.toggle("blanked", dv.getUint8(5) === 1);
+
+  const W = canvas.width, H = canvas.height;
+  ctx.globalCompositeOperation = "source-over";
+  ctx.fillStyle = "rgba(0,0,0,0.32)";      // phosphor decay
+  ctx.fillRect(0, 0, W, H);
+  if (n < 2) return;
+
+  ctx.globalCompositeOperation = "lighter";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  const scale = W / 800;                    // stroke widths tuned at 800px
+
+  let off = 6;                              // 2 + 4 header bytes
+  let px = null, py = null, pr = 0, pg = 0, pb = 0;
+  for (let i = 0; i < n; i++) {
+    const x = dv.getUint16(off, true) / 0xFFF * W;
+    const y = (1 - dv.getUint16(off + 2, true) / 0xFFF) * H;
+    const r = dv.getUint8(off + 4), g = dv.getUint8(off + 5), b = dv.getUint8(off + 6);
+    off += 7;
+    if (px !== null) {
+      ctx.strokeStyle = `rgba(${pr},${pg},${pb},0.10)`;   // halo
+      ctx.lineWidth = 9 * scale;
+      ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(x, y); ctx.stroke();
+      ctx.strokeStyle = `rgba(${pr},${pg},${pb},0.95)`;   // core
+      ctx.lineWidth = 1.6 * scale;
+      ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(x, y); ctx.stroke();
+    }
+    px = x; py = y; pr = r; pg = g; pb = b;
+  }
+}
+
+/* Reconnecting WebSocket — a monitor left on a second screen should come
+   back on its own after a synth restart. */
+let ws = null, retry = null;
+function connect() {
+  clearTimeout(retry);
+  ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://")
+                     + location.host + "/ws");
+  ws.binaryType = "arraybuffer";
+  ws.onopen = () => { connEl.textContent = ""; connEl.classList.remove("lost"); };
+  ws.onmessage = (e) => { if (e.data instanceof ArrayBuffer) onFrame(e.data); };
+  ws.onclose = () => {
+    connEl.textContent = "reconnecting…";
+    connEl.classList.add("lost");
+    retry = setTimeout(connect, 1000);
+  };
+  ws.onerror = () => ws.close();
+}
+connect();
+
+/* double-click anywhere for fullscreen on the second display */
+document.addEventListener("dblclick", () => {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else document.documentElement.requestFullscreen().catch(() => {});
+});
+
+/* fade the hint out once, and only show the cursor while it's moving */
+let idle = null;
+function stirCursor() {
+  document.body.style.cursor = "default";
+  clearTimeout(idle);
+  idle = setTimeout(() => { document.body.style.cursor = "none"; }, 2000);
+}
+document.addEventListener("mousemove", stirCursor);
+setTimeout(() => document.body.classList.add("idle-ui"), 4000);
+</script>
+</body>
+</html>

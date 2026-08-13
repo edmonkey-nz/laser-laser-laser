@@ -39,6 +39,11 @@
     background: var(--track); color: var(--ink);
     border: none; border-radius: 4px; padding: .35rem .7rem;
   }
+  #open-monitor { display: inline-flex; align-items: center; gap: .4rem; }
+  #open-monitor svg {
+    width: 13px; height: 13px; fill: none; stroke: currentColor;
+    stroke-width: 1.4; stroke-linecap: round;
+  }
   #blank.banner-btn { color: var(--danger); }
   #blank.banner-btn.on { background: var(--danger); color: #fff; }
   #open-settings:focus-visible { outline: 2px solid var(--accent); }
@@ -125,6 +130,7 @@
   }
   #stage { min-width: 0; }
   #scope-wrap { max-width: min(100%, 479px); margin: 0 auto; }
+  #scope.masking { cursor: crosshair; }
   #controls {
     display: grid; grid-template-columns: repeat(3, minmax(200px, 232px));
     gap: .8rem; align-items: start;
@@ -153,6 +159,7 @@
 
   /* ---- text panel (under visualiser) ---- */
   #text-panel { max-width: min(100%, 479px); margin: 1rem auto 0; }
+  #mask-panel { max-width: min(100%, 479px); margin: 1rem auto 0; }
   .text-row { display: flex; gap: .4rem; }
   .text-row textarea {
     flex: 1; min-width: 0; font: inherit; font-size: .85rem;
@@ -259,6 +266,10 @@
   }
   #pat-list { margin-top: .6rem; display: flex; flex-wrap: wrap; gap: .4rem; }
   #pat-list .hint { color: var(--ink-dim); font-size: .75rem; }
+  #mask-list { margin-top: .6rem; display: flex; flex-wrap: wrap; gap: .4rem;
+               max-height: 150px; overflow-y: auto; }
+  #mask-list .hint { color: var(--ink-dim); font-size: .75rem; }
+  #mask-list .chip.on .load { background: var(--accent); color: #0a0c11; }
   .chip { display: flex; }
   .chip button {
     font: inherit; font-size: .75rem; cursor: pointer; border: none;
@@ -297,7 +308,26 @@
     font-size: .68rem; font-weight: 600; letter-spacing: .22em;
     color: var(--ink-dim); text-transform: uppercase; margin-bottom: .7rem;
   }
+  /* ---- collapsible panels (Text, Mask) ---- */
+  .panel.collapsible > h2 { margin-bottom: 0; }
+  .panel.collapsible:not(.collapsed) > h2 { margin-bottom: .7rem; }
+  .panel-toggle {
+    font: inherit; color: inherit; letter-spacing: inherit;
+    text-transform: inherit; background: none; border: none; padding: 0;
+    width: 100%; text-align: left; cursor: pointer;
+    display: flex; align-items: center; gap: .45rem;
+  }
+  .panel-toggle::before {
+    content: "▾"; font-size: .7em; line-height: 1;
+    transition: transform .15s; transform-origin: 50% 55%;
+  }
+  .panel.collapsed .panel-toggle::before { transform: rotate(-90deg); }
+  .panel-toggle:hover { color: var(--ink); }
+  .panel-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .panel.collapsed .panel-body { display: none; }
+  @media (prefers-reduced-motion: reduce) { .panel-toggle::before { transition: none; } }
   .shapes, .toggles { display: flex; flex-wrap: wrap; gap: .4rem; }
+  .toggles[hidden] { display: none; }   /* the flex above beats [hidden] */
   .toggles { margin-top: .55rem; }
   .shapes button, .toggles button {
     flex: 1 1 30%;
@@ -352,6 +382,10 @@
   <button id="open-about" class="banner-btn">ABOUT</button>
   <button id="open-settings">SETTINGS</button>
   <div id="status">connecting…</div>
+  <button id="open-monitor" class="banner-btn" title="open the beam view in
+its own window — drag it to a second screen and double-click for fullscreen">
+    <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="2" width="14"
+      height="9.5" rx="1.5"/><path d="M5.5 14h5"/></svg>MONITOR</button>
   <button id="blank" class="banner-btn">BLANK</button>
 </header>
 
@@ -379,8 +413,10 @@
       <div id="blank-veil">BLANKED</div>
     </div>
 
-    <div class="panel" id="text-panel">
-      <h2>Text</h2>
+    <div class="panel collapsible collapsed" id="text-panel">
+      <h2><button class="panel-toggle" aria-expanded="false"
+                  aria-controls="text-body">Text</button></h2>
+      <div class="panel-body" id="text-body">
       <div class="text-row">
         <textarea id="text-input" rows="4" maxlength="140"
                   placeholder="type to project… (up to 4 lines)"
@@ -391,6 +427,40 @@
         <button data-s="0" class="active">plain</button>
         <button data-s="1">script</button>
         <button data-s="2">bold</button>
+      </div>
+      </div>
+    </div>
+
+    <div class="panel collapsible collapsed" id="mask-panel">
+      <h2><button class="panel-toggle" aria-expanded="false"
+                  aria-controls="mask-body">Mask</button></h2>
+      <div class="panel-body" id="mask-body">
+      <div class="toggles" id="mask-power">
+        <button id="mask-on">ON</button>
+        <button id="mask-off">OFF</button>
+        <button id="mask-invert" title="swap keep-inside for block-inside">INVERT</button>
+      </div>
+      <div class="toggles">
+        <button id="mask-draw">DRAW…</button>
+        <button id="mask-newpoly" title="start another shape">NEW SHAPE</button>
+        <button id="mask-undo">UNDO</button>
+        <button id="mask-clear">CLEAR</button>
+      </div>
+      <div class="toggles" id="mask-mode" hidden>
+        <button data-m="add" class="active">ADD</button>
+        <button data-m="select">SELECT</button>
+        <button data-m="delete">DELETE</button>
+      </div>
+      <div class="bank-row" style="margin-top:.6rem">
+        <input id="mask-name" maxlength="32" placeholder="mask name"
+               autocomplete="off" spellcheck="false">
+        <button id="mask-save">SAVE</button>
+      </div>
+      <div id="mask-list"></div>
+      <div class="map-hint" id="mask-hint">DRAW, then click on the scope to lay
+        down points — the beam is blanked outside the shape, on the laser and
+        the monitor alike. Blanking only: the beam still travels masked areas
+        dark.</div>
       </div>
     </div>
   </div>
@@ -694,13 +764,36 @@ const fmt = (v, step) => step >= 1 ? String(Math.round(v)) : (+v).toFixed(2);
 
 /* ---------------- shape buttons + blank ---------------- */
 const shapesEl = document.getElementById("shapes");
+/* ---------------- collapsible panels ---------------- */
+// Text and Mask start collapsed — they're occasional-use, and the stage
+// column reads better without them expanded by default.
+function setPanelOpen(panel, open) {
+  if (!panel) return;
+  panel.classList.toggle("collapsed", !open);
+  const t = panel.querySelector(".panel-toggle");
+  if (t) t.setAttribute("aria-expanded", open ? "true" : "false");
+}
+for (const t of document.querySelectorAll(".panel.collapsible .panel-toggle")) {
+  t.addEventListener("click", () => {
+    const panel = t.closest(".panel");
+    setPanelOpen(panel, panel.classList.contains("collapsed"));
+  });
+}
+
 let shapeBtns = [];
 function buildShapes(names) {
   shapesEl.innerHTML = "";
   shapeBtns = names.map((n, i) => {
     const b = document.createElement("button");
     b.textContent = n;
-    b.addEventListener("click", () => send({ type: "shape", index: i }));
+    b.addEventListener("click", () => {
+      send({ type: "shape", index: i });
+      // picking the text shape is a request to type something
+      if (n === "text") {
+        setPanelOpen(document.getElementById("text-panel"), true);
+        textInput.focus();
+      }
+    });
     shapesEl.appendChild(b);
     return b;
   });
@@ -1094,6 +1187,245 @@ document.getElementById("custom-apply").addEventListener("click", () => {
   customModal.hidden = true;
 });
 
+/* ---------------- output monitor window ---------------- */
+// Reuses the window name, so clicking again focuses the existing monitor
+// instead of piling up windows.
+let monitorWin = null;
+document.getElementById("open-monitor").addEventListener("click", () => {
+  if (monitorWin && !monitorWin.closed) { monitorWin.focus(); return; }
+  monitorWin = window.open("/monitor", "laserMonitor",
+                           "width=900,height=900,menubar=no,toolbar=no");
+  if (!monitorWin) alert("The monitor window was blocked — allow pop-ups for this page.");
+});
+
+/* ---------------- mask (polygon blanking over the live scope) ---------------- */
+const MAX_MASK_POLYS = 8, MAX_MASK_POINTS = 64;
+const maskCanvas = document.getElementById("scope");
+const maskListEl = document.getElementById("mask-list");
+const maskNameEl = document.getElementById("mask-name");
+const maskModeEl = document.getElementById("mask-mode");
+const maskDrawBtn = document.getElementById("mask-draw");
+let maskPolys = [];          // [[[x,y],...],...] in [-1,1]
+let maskOn = false, maskInvert = false, maskName = null;
+let maskEditing = false, maskMode = "add", maskCur = 0;
+let maskSel = -1, maskDragging = false;
+let maskListFp = "", maskSendTimer = null, maskLocalUntil = 0;
+
+function maskToCanvas([x, y]) {
+  // inverse of the beam mapping in onFrame()
+  return [(x + 1) / 2 * maskCanvas.width, (1 - y) / 2 * maskCanvas.height];
+}
+function maskEventPos(e) {
+  // the scope is CSS-scaled, so map client px back into canvas px
+  const r = maskCanvas.getBoundingClientRect();
+  const t = e.touches ? e.touches[0] : e;
+  return [(t.clientX - r.left) * maskCanvas.width / r.width,
+          (t.clientY - r.top) * maskCanvas.height / r.height];
+}
+function maskFromCanvas(px, py) {
+  return [Math.max(-1, Math.min(1, px / maskCanvas.width * 2 - 1)),
+          Math.max(-1, Math.min(1, 1 - py / maskCanvas.height * 2))];
+}
+function maskHitTest(px, py) {
+  const r = maskCanvas.getBoundingClientRect();
+  const rad = 11 * maskCanvas.width / (r.width || maskCanvas.width);
+  for (let pi = 0; pi < maskPolys.length; pi++) {
+    for (let i = 0; i < maskPolys[pi].length; i++) {
+      const [x, y] = maskToCanvas(maskPolys[pi][i]);
+      if (Math.hypot(px - x, py - y) < rad) return [pi, i];
+    }
+  }
+  return null;
+}
+function maskPush(now) {
+  clearTimeout(maskSendTimer);
+  maskSendTimer = null;
+  const fire = () => {
+    maskSendTimer = null;
+    // the state broadcast lags by up to 200 ms — hold off on echoes so a
+    // stale one can't stomp what was just drawn
+    maskLocalUntil = Date.now() + 600;
+    send({ type: "mask_set", polys: maskPolys, invert: maskInvert });
+  };
+  maskLocalUntil = Date.now() + 600;
+  if (now) fire(); else maskSendTimer = setTimeout(fire, 100);
+}
+function maskCurPoly() {
+  if (!maskPolys.length) { maskPolys.push([]); maskCur = 0; }
+  if (maskCur >= maskPolys.length) maskCur = maskPolys.length - 1;
+  return maskPolys[maskCur];
+}
+function drawMaskOverlay() {
+  if (!maskEditing && !(maskOn && maskPolys.length)) return;
+  ctx.globalCompositeOperation = "source-over";   // onFrame leaves "lighter"
+  ctx.lineJoin = "round";
+  maskPolys.forEach((poly, pi) => {
+    if (!poly.length) return;
+    const px = poly.map(maskToCanvas);
+    const cur = maskEditing && pi === maskCur;
+    ctx.setLineDash(maskEditing ? [] : [6, 6]);
+    ctx.beginPath();
+    ctx.moveTo(px[0][0], px[0][1]);
+    for (let i = 1; i < px.length; i++) ctx.lineTo(px[i][0], px[i][1]);
+    if (px.length > 2) ctx.closePath();
+    ctx.strokeStyle = maskEditing
+      ? (cur ? "#4ade80" : "rgba(74,222,128,.30)")
+      : "rgba(74,222,128,.30)";
+    ctx.lineWidth = cur ? 2.5 : 1.8;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    if (!maskEditing) return;
+    px.forEach(([x, y], i) => {
+      ctx.beginPath();
+      ctx.arc(x, y, 9, 0, 7);
+      ctx.fillStyle = (cur && i === maskSel) ? "#d8e6f2"
+                    : cur ? "#4ade80" : "rgba(74,222,128,.4)";
+      ctx.fill();
+      ctx.fillStyle = "#0a0c11";
+      ctx.font = "11px monospace";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(String(i + 1), x, y);
+    });
+  });
+}
+maskCanvas.addEventListener("pointerdown", (e) => {
+  if (!maskEditing) return;
+  e.preventDefault();
+  const [px, py] = maskEventPos(e);
+  const hit = maskHitTest(px, py);
+  if (maskMode === "delete") {
+    if (hit) {
+      maskPolys[hit[0]].splice(hit[1], 1);
+      if (!maskPolys[hit[0]].length && maskPolys.length > 1) {
+        maskPolys.splice(hit[0], 1);
+        maskCur = Math.min(maskCur, maskPolys.length - 1);
+      }
+      maskSel = -1;
+      maskPush();
+    }
+    return;
+  }
+  if (maskMode === "select") {
+    if (hit) {
+      maskCur = hit[0]; maskSel = hit[1]; maskDragging = true;
+      maskCanvas.setPointerCapture(e.pointerId);
+    } else maskSel = -1;
+    return;
+  }
+  // add: clicking an existing handle just selects it
+  if (hit) { maskCur = hit[0]; maskSel = hit[1]; return; }
+  const poly = maskCurPoly();
+  if (poly.length >= MAX_MASK_POINTS) return;
+  poly.push(maskFromCanvas(px, py));
+  maskSel = poly.length - 1;
+  maskPush();
+});
+maskCanvas.addEventListener("pointermove", (e) => {
+  if (!maskDragging || maskSel < 0) return;
+  const [px, py] = maskEventPos(e);
+  maskPolys[maskCur][maskSel] = maskFromCanvas(px, py);
+  maskPush();
+});
+function maskEndDrag() { maskDragging = false; }
+maskCanvas.addEventListener("pointerup", maskEndDrag);
+maskCanvas.addEventListener("pointercancel", maskEndDrag);
+
+const maskModeBtns = Array.from(document.querySelectorAll("#mask-mode button"));
+for (const b of maskModeBtns) {
+  b.addEventListener("click", () => {
+    maskMode = b.dataset.m;
+    maskModeBtns.forEach(x => x.classList.toggle("active", x === b));
+  });
+}
+function setMaskEditing(on) {
+  maskEditing = on;
+  maskSel = -1; maskDragging = false;
+  maskModeEl.hidden = !on;
+  maskDrawBtn.textContent = on ? "DONE" : "DRAW…";
+  maskDrawBtn.classList.toggle("active", on);
+  maskCanvas.classList.toggle("masking", on);
+  if (on) {
+    maskMode = "add";
+    maskModeBtns.forEach(x => x.classList.toggle("active", x.dataset.m === "add"));
+    maskCurPoly();
+  } else {
+    maskPush(true);
+  }
+}
+maskDrawBtn.addEventListener("click", () => setMaskEditing(!maskEditing));
+document.getElementById("mask-newpoly").addEventListener("click", () => {
+  if (!maskEditing) setMaskEditing(true);
+  if (maskPolys.length >= MAX_MASK_POLYS) return;
+  if (maskPolys.length && !maskPolys[maskPolys.length - 1].length) return;
+  maskPolys.push([]);
+  maskCur = maskPolys.length - 1;
+  maskSel = -1;
+});
+document.getElementById("mask-undo").addEventListener("click", () => {
+  const poly = maskPolys[maskCur];
+  if (!poly) return;
+  poly.pop();
+  if (!poly.length && maskPolys.length > 1) {
+    maskPolys.splice(maskCur, 1);
+    maskCur = maskPolys.length - 1;
+  }
+  maskSel = -1;
+  maskPush();
+});
+document.getElementById("mask-clear").addEventListener("click", () => {
+  maskPolys = maskEditing ? [[]] : [];
+  maskCur = 0; maskSel = -1;
+  maskPush(true);
+});
+document.getElementById("mask-on").addEventListener("click", () =>
+  send({ type: "mask_enable", value: true }));
+document.getElementById("mask-off").addEventListener("click", () =>
+  send({ type: "mask_enable", value: false }));
+document.getElementById("mask-invert").addEventListener("click", () => {
+  maskInvert = !maskInvert;
+  maskPush(true);
+});
+document.getElementById("mask-save").addEventListener("click", () => {
+  const n = maskNameEl.value.trim();
+  if (!n) { maskNameEl.focus(); return; }
+  if (maskEditing) setMaskEditing(false);
+  send({ type: "mask_save", name: n });
+});
+maskNameEl.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") document.getElementById("mask-save").click();
+});
+function renderMaskList(names, active) {
+  maskListEl.innerHTML = "";
+  if (!names.length) {
+    maskListEl.innerHTML = '<span class="hint">no saved masks — draw a shape, name it, hit SAVE</span>';
+    return;
+  }
+  for (const n of names) {
+    const chip = document.createElement("div");
+    chip.className = "chip" + (n === active ? " on" : "");
+    const load = document.createElement("button");
+    load.className = "load";
+    load.textContent = n;
+    load.title = "load mask '" + n + "'";
+    load.addEventListener("click", () => {
+      if (maskEditing) setMaskEditing(false);
+      send({ type: "mask_load", name: n });
+      maskLocalUntil = 0;     // take the server's polygons straight back
+      maskNameEl.value = n;   // load, tweak, SAVE overwrites
+    });
+    const del = document.createElement("button");
+    del.className = "del";
+    del.textContent = "×";
+    del.title = "delete '" + n + "'";
+    del.addEventListener("click", () => {
+      if (confirm('Delete mask "' + n + '"?'))
+        send({ type: "mask_delete", name: n });
+    });
+    chip.append(load, del);
+    maskListEl.appendChild(chip);
+  }
+}
+
 /* ---------------- per-pattern PPS/points override ---------------- */
 const ovrPps = document.getElementById("ovr-pps");
 const ovrPoints = document.getElementById("ovr-points");
@@ -1461,6 +1793,23 @@ function onState(s) {
   }
   if (document.activeElement !== ildaSel && (s.ilda_file || "") !== ildaSel.value)
     ildaSel.value = s.ilda_file || "";
+  // mask: don't clobber the working shape while the user is drawing
+  const mk = s.mask || {};
+  maskOn = !!mk.on;
+  document.getElementById("mask-on").classList.toggle("active", maskOn);
+  document.getElementById("mask-off").classList.toggle("active", !maskOn);
+  document.getElementById("mask-invert").classList.toggle("active", !!mk.invert);
+  if (!maskEditing && Date.now() > maskLocalUntil) {
+    maskInvert = !!mk.invert;
+    maskPolys = (mk.polys || []).map(p => p.map(q => q.slice()));
+    maskCur = Math.max(0, maskPolys.length - 1);
+  }
+  maskName = mk.name || null;
+  const maskFp = JSON.stringify([mk.saved || [], maskName]);
+  if (maskFp !== maskListFp) {
+    maskListFp = maskFp;
+    renderMaskList(mk.saved || [], maskName);
+  }
   document.getElementById("t-instant").classList.toggle("active", !s.xfade);
   document.getElementById("t-xfade").classList.toggle("active", !!s.xfade);
   // text: reflect current string/style unless the user is editing
@@ -1572,7 +1921,7 @@ function onFrame(buf) {
   ctx.fillStyle = "rgba(0,0,0,0.32)";
   ctx.fillRect(0, 0, W, H);
 
-  if (n < 2) return;
+  if (n < 2) { drawMaskOverlay(); return; }
   ctx.globalCompositeOperation = "lighter";
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
@@ -1596,6 +1945,7 @@ function onFrame(buf) {
     }
     px = x; py = y; pr = r; pg = g; pb = b;
   }
+  drawMaskOverlay();
 }
 </script>
 </body>
