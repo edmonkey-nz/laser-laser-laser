@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -o /dev/null -w \"http:%{http_code}\\\\n\" http://localhost:8099/)",
+      "Bash(curl -s -o /dev/null *)",
+      "Bash(pio device list*)",
+      "Bash(pio device monitor *)",
+      "Bash(pio pkg search *)",
+      "Bash(bluetoothctl info *)"
+    ]
+  }
+}

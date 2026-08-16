@@ -20,9 +20,10 @@ needed. Laid out as visualiser + pattern bank on the left and three
 columns of controls on the right, everything on screen at once at 1080p.
 It collapses to fewer columns on narrow windows and stacks fully on
 mobile. Live beam view with phosphor glow, shape buttons, a fader for
-every parameter, bass/mid/high meters, and a BLANK button in the top
-bar. The server binds to all interfaces, so a phone or tablet on the
-same LAN works as a wireless control surface — `http://<machine-ip>:8080`.
+every parameter, bass/mid/high meters, and the ARM / brightness-ceiling /
+BLANK controls in the top bar. The server binds to all interfaces, so a
+phone or tablet on the same LAN works as a wireless control surface —
+`http://<machine-ip>:8080`.
 State echoes to the page at 5 Hz and frames stream as compact binary over
 a WebSocket at 30 Hz. No auth — it's for your LAN, not the internet.
 
@@ -46,9 +47,9 @@ than opening another. The address is `/monitor`, so you can also just open
 LAN). The mask outline is deliberately not drawn here — it's an editing
 aid, and this is meant to be a clean feed.
 
-**MIDI**: every parameter, and the pause / stop-spin / blank actions,
-can be mapped to a MIDI CC or note — there's no fixed mapping to
-memorise. Open **Settings → MIDI mapping**, hit LEARN on any row, and
+**MIDI**: every parameter, and the pause / stop-spin / blank / disarm
+actions, can be mapped to a MIDI CC or note — there's no fixed mapping
+to memorise. Open **Settings → MIDI mapping**, hit LEARN on any row, and
 move a knob or press a pad to bind it; bindings persist in
 `settings.json`. Rotary encoders get a per-row mode (absolute / relative
 / soft-takeover) — see [Settings](#settings). Pattern recall is mapped
@@ -62,8 +63,9 @@ different.
 
 **Keyboard** (preview window): `1–9` shapes, `←/→` ratio A, `↑/↓` ratio
 B, `[`/`]` size, `m` morph, `s` spin, `h` hue, `a` audio amount, `d`/`D`
-copies up/down, `c` mono, `f`/`g` flip X/Y, `SPACE` blank, `ESC`/`q`
-quit (blanks the laser on the way out).
+copies up/down, `c` mono, `f`/`g` flip X/Y, `SPACE` blank, `.` disarm
+the laser (`shift-.` arms it), `ESC`/`q` quit (blanks the laser on the
+way out).
 
 ### Shapes
 
@@ -343,6 +345,87 @@ it. STOP SPIN zeroes the spin rate and resets the figure upright. Both,
 plus **BLANK**, are mappable to MIDI buttons (they fire on the press and
 ignore the release, so a momentary pad toggles cleanly).
 
+### Output safety: ARM and the brightness ceiling
+
+Two controls sit together in the header, and they are the only things
+standing between the render loop and a live beam.
+
+**ARM / DISARM** is the output gate. The app always starts **disarmed**,
+and nothing is emitted until you arm it — this is never remembered
+between runs, however the last session ended. Arming asks for
+confirmation; disarming never does, and takes effect on the very next
+frame with no crossfade. You can also disarm with `.` in the preview
+window (`shift-.` arms) or from a MIDI pad via the **DISARM laser**
+action in the mapping table. The MIDI action is deliberately one-way: a
+stray CC should never be able to arm a laser.
+
+Note that "disarmed" does not mean the DAC goes quiet — it means it is
+actively streaming darkness. A Helios that simply stops being fed repeats
+its last frame forever, so silence would be the *less* safe state.
+
+**MAX** is a hard ceiling on output brightness, applied at the very last
+step before the DAC — after the scene, the mask, the geometry warp and
+every other transform. Nothing upstream can exceed it: not a pattern
+load, not audio modulation, not a MIDI knob. It defaults to **5%** and
+persists in `settings.json`. It is separate from the `brightness` fader
+in Colour & beam, which stays a purely creative control.
+
+The header shows the ceiling but does **not** let you change it — it
+turns amber above 5%, so a raised ceiling is visible at a glance without
+being one stray click away from moving. Changing it lives in **Settings →
+Brightness ceiling**, and raising it above 5% asks for confirmation.
+**SET 5% (BRING-UP)** snaps it back.
+
+On the LaserCube this is the only brightness limiter that exists — the
+network protocol has no power-limit command, so there is no firmware cap
+sitting downstream of a host-side bug.
+
+At 5% on an 8-bit colour channel you have about 13 levels to play with —
+plenty for aiming, coarse for content.
+
+> **The ceiling is a creative limiter, not a safety interlock.** Neither
+> it nor the ARM gate can help you against a crash, a driver bug or a
+> stuck buffer. The key switch, aperture shutter, interlock loop, Remote
+> Stop, proper eyewear and a controlled beam path are the actual safety
+> layer, and they are mandatory regardless of what this software does.
+> **[SAFETY.md](SAFETY.md)** covers all of this properly, including the
+> operating procedure and the hardware bring-up checklist.
+
+Behind these, and needing no attention from you: the output blanks on
+every exit path — Ctrl-C, `kill`, an unhandled exception, or closing the
+window — and a watchdog thread blanks the beam if the render loop ever
+stops feeding it.
+
+### Choosing an output device
+
+**Settings → Laser output** picks where the beam goes: **none**, **Helios
+DAC (USB)**, or **LaserCube (network)**. You can switch live, without
+restarting, and the choice is remembered.
+
+**Switching always disarms.** Arming is a statement about one particular
+projector, so it is never carried across a device change — re-arm
+deliberately, every time. If the new device can't be opened, output falls
+back to none rather than leaving a dead device selected.
+
+A remembered choice that fails to open at startup falls back to none with
+a message. An explicit `--output` or `--laser` on the command line does
+not: if you named a device, failing to open it is fatal, because starting
+silently with no output would let you believe a laser is live when
+nothing is connected.
+
+**TEST DEVICE** queries the attached device and shows what it reports
+about itself. It emits nothing, so it is safe to press at any time. A
+LaserCube reports firmware, serial, model, connection type, temperature
+and thermal warnings, interlock state, output state, power source, scan
+rate and its maximum, buffer occupancy and its own packet-error count,
+alongside our frame sent/dropped/error counters. A Helios reports device
+count and link status — it has no temperature, interlock or power
+telemetry to give, and the panel says so rather than showing blanks.
+
+The LaserCube runs over Ethernet or WiFi; use **Ethernet**. Buffer levels
+are unstable over WiFi and the app warns if it finds itself on it.
+`--list-lasercubes` prints every unit it can find on the network.
+
 ### Settings
 
 **Settings** (button in the header): a modal with runtime engine settings
@@ -383,6 +466,18 @@ points. The DAC is double-buffered, so `write_frame()` blocking on
 `GetStatus` naturally paces the render loop to the point clock — no
 timers needed when the laser is running.
 
+Everything bound for the DAC passes through `SafeOutput` in
+`laser_output.py`, which owns the ARM gate, the brightness ceiling, the
+watchdog and blanking on exit. `WriteFrame()` without
+`HELIOS_FLAG_SINGLE_MODE` *repeats* its frame until the next one arrives,
+which is why blanking writes a dark frame rather than merely calling
+`Stop()` — a stopped-but-unblanked DAC sits there replaying whatever was
+last sent.
+
+`laser_output.py` and `helios.py` are written to be copied verbatim into
+the sibling laser projects, so they depend on nothing but numpy and the
+standard library.
+
 ## Project layout
 
 The Python modules and their data files all sit in the repo root, flat and
@@ -393,6 +488,11 @@ PyInstaller bundle flattens to the same layout. Docs and helper scripts
 live in `docs/` and `scripts/`.
 
 - `laserx3.py` — main app (render loop, MIDI, audio, preview)
+- `laser_output.py` — output safety layer (ARM gate, brightness ceiling,
+  watchdog, blank-on-exit); shared verbatim with the sibling projects
+- `helios.py` — Helios DAC backend (USB, ctypes over libHeliosDacAPI)
+- `lasercube_output.py` — LaserCube backend (network, pure Python UDP);
+  `scripts/lasercube_sim.py` is a fake device for testing without hardware
 - `webui.py` + `static/index.html` — browser control surface
 - `static/monitor.html` — chrome-free output monitor page (`/monitor`)
 - `patterns.py` + `patterns.json` — pattern bank storage (a few starter

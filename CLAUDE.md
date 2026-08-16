@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A laser visuals synth for the Helios DAC: a Python render loop generating
-point frames, driven from a browser control surface, a MIDI controller, and
-a pygame preview window simultaneously.
+A laser visuals synth for the Helios DAC and the LaserCube (network): a
+Python render loop generating point frames, driven from a browser control
+surface, a MIDI controller, and a pygame preview window simultaneously.
 
 ## Commands
 
@@ -16,10 +16,23 @@ pip install -r requirements.txt
 
 python laserx3.py                  # preview + browser UI, NO laser — dev mode
 python laserx3.py --web            # browser UI only, no pygame window
-python laserx3.py --laser          # real DAC output
+python laserx3.py --laser          # real DAC output (alias for --output helios)
+python laserx3.py --output lasercube          # LaserCube over the network
+python laserx3.py --output lasercube --lasercube-dry-run   # pack, send nothing
 python laserx3.py --list-midi      # enumerate MIDI ports
+python laserx3.py --list-lasercubes           # discover LaserCubes
 python laserx3.py --version
+
+python scripts/lasercube_sim.py    # fake LaserCube: test the whole path,
+                                   # zero photons. --stall-after / --drop /
+                                   # --refuse-enable / --temperature / etc.
 ```
+
+**Output starts disarmed with a 5% brightness ceiling**, on every backend.
+Nothing is emitted until ARM. Arming can fail (the LaserCube refuses while
+over-temperature), so `arm()` returns a bool — do not assume it succeeded.
+The output device is switchable at runtime from Settings, and switching
+always disarms.
 
 The browser UI is always on (`--no-web` opts out); port 8080, `--web-port`
 to move it. Never tell a user to pass `--web` to get the UI — passing it
@@ -42,7 +55,14 @@ Standalone executables are built in CI only (`pyinstaller.spec` +
   `CHANGELOG.md` entry.** (CONTRIBUTING.md ground rule.)
 - Laser safety governs anything touching the DAC stream: preserve the
   "closed curves + blanked travel moves + blank on exit" properties. Test in
-  `--preview` before `--laser`.
+  `--preview` before `--laser`. **`docs/SAFETY.md` §6 is the rulebook for
+  changing anything on this path** — read it before touching output code.
+- **`laser_output.py`, `helios.py` and `lasercube_output.py` are copied
+  verbatim into laser-arcade and promptwaver.** Keep them importable
+  standalone — numpy + stdlib only, nothing from this project, Python 3.9
+  compatible (laser-arcade's floor). A bug in `laser_output.py` is a safety
+  bug in three repos. The safety requirements it implements are
+  `docs/lasercubeoutput.md` §4.
 - `settings.json` and `masks.json` are gitignored runtime state;
   `patterns.json` is tracked and ships with starter patterns.
 - **The flat root layout is deliberate — do not "tidy" the Python modules
@@ -69,9 +89,15 @@ if engine.blanked: frame[:, 2:6] = 0
 frame = mask.apply(frame)          # ← shared: hits preview, web AND DAC
     ├── preview.draw(frame)                    (pygame window)
     ├── web.publish(frame, ...)                (browser scope)
-    └── out = geom.apply(hw_orient(frame, ...)) # ← DAC-ONLY, never shared
-        dac.write_frame(out, pps)
+    └── out.write(geom.apply(hw_orient(frame, ...)), pps)
+                                    # ← DAC-ONLY, never shared
 ```
+
+`out` is a `SafeOutput` (`laser_output.py`) wrapping the backend. Inside
+`write()` it applies the arm gate and the brightness ceiling — the last
+transform before the device, so nothing upstream can bypass them. Those are
+DAC-only for the same reason `geom` is: the monitor must keep showing what the
+*content* is, or the ceiling becomes invisible instead of obvious.
 
 `hw_orient()` and `GeometryCorrection.apply()` are deliberately applied only
 to the DAC copy so the preview stays a true, uncorrected reference —
@@ -82,6 +108,33 @@ the whole design.
 
 Normalised space is `[-1,1]` everywhere in the UI and stored data; the
 12-bit conversion is `v/2047.5 - 1` (see `geometry.py:90`, `mask.py`).
+
+### Output backends
+
+Backends implement the `LaserOutput` protocol (`laser_output.py`) and are
+built by `make_backend(kind)` in `laserx3.py` — a literal `if/elif` with
+direct imports, because PyInstaller cannot trace `importlib`. Adding one
+means a class plus a branch; nothing else in the loop changes.
+
+Two properties carry the design:
+
+- `paces_loop` — True when `write()` blocks until the device is ready, so the
+  device's own point clock times the render loop. Helios True (it blocks on
+  `GetStatus`), LaserCube and Null False (the loop must sleep itself).
+- optional `enable()`/`disable()` — a *hardware* output gate, mirrored from
+  the arm state by `SafeOutput._gate_device`. The LaserCube has one
+  (`CMD_SET_OUTPUT`); the Helios does not, and its safe state is streaming
+  darkness instead. `enable()` may legitimately refuse, and `arm()` honours
+  that refusal rather than reporting ARMED over a dark device.
+
+`lasercube_output.py` is UDP and non-blocking: `write()` swaps the frame into
+a lock-guarded slot (the `WebUI.publish` pattern) and a daemon sender thread
+streams it, paced to the DAC rate with `rx_buffer_free` as a brake. It never
+blocks the render thread — promptwaver shares a process with a realtime audio
+callback, and a blocked render thread there is an audible xrun. Its module
+docstring carries the protocol, with a source cited per constant; the
+protocol is reverse-engineered, so treat it as unverified until hardware says
+otherwise. `scripts/lasercube_sim.py` is a fake device for testing it.
 
 ### Frame sources
 

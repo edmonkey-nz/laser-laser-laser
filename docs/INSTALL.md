@@ -124,11 +124,15 @@ identical to Linux.
 
 ```bash
 python3 laserx3.py                       # pygame preview + browser UI (both on by default)
-python3 laserx3.py --laser               # laser + browser UI
+python3 laserx3.py --laser               # Helios DAC + browser UI
 python3 laserx3.py --laser --preview     # laser + pygame mirror + browser UI
 python3 laserx3.py --list-midi           # find your controller
 python3 laserx3.py --laser --midi "MPK"  # match MIDI port by substring
 ```
+
+**Output starts disarmed.** Whatever you launch with, nothing is emitted
+until you press ARM in the header, and the brightness ceiling starts at
+5%. See [SAFETY.md](SAFETY.md).
 
 **You never need to pass `--web`.** The browser control surface is always
 on — including in the prebuilt executables — so
@@ -144,4 +148,58 @@ Options: `--points N` (default 800) and `--pps N` (default 30000).
 Frame rate ≈ pps/points, so 800 pts @ 30 kpps ≈ 37 fps. Fewer points =
 faster/smoother motion but coarser curves; the Helios tops out at 65 kpps
 if your scanners can take it.
+
+### Choosing an output device
+
+```bash
+python3 laserx3.py --output none         # no laser (default)
+python3 laserx3.py --output helios       # Helios DAC over USB; --laser is an alias
+python3 laserx3.py --output lasercube    # LaserCube over the network
+```
+
+You can also switch device live in **Settings → Laser output**, without
+restarting, and the choice is remembered. A remembered choice that fails
+to open falls back to no output with a message; an explicit `--output` on
+the command line that fails is fatal, because starting silently with no
+output would let you believe a laser is connected when it isn't.
+
+`--max-brightness F` sets the hard output ceiling (0..1, default 0.05).
+It persists, so you normally set it once in Settings rather than per run.
+
+### LaserCube over the network
+
+Use the **Ethernet** adapter, not WiFi — buffer levels are unstable over
+WiFi and the app warns if it finds itself on it.
+
+```bash
+python3 laserx3.py --list-lasercubes      # discover units and print status
+python3 laserx3.py --output lasercube --lasercube-ip 192.168.1.50
+python3 laserx3.py --output lasercube --lasercube-dry-run
+```
+
+`--lasercube-ip` skips broadcast discovery. `--lasercube-dry-run` does all
+the packing and rate control but transmits nothing, so you can validate
+throughput and the watchdog with zero photons.
+`--lasercube-point-order rgbxy` swaps the wire field order — only needed
+if the hardware disagrees with the protocol spec, which is the first
+thing to try if the first frame comes out as garbage.
+
+No extra dependencies: the LaserCube path is pure Python (`socket` +
+`struct`), so there's no shared library to build or install for it.
+
+**Testing without hardware.** `scripts/lasercube_sim.py` is a fake
+LaserCube that answers on the real ports:
+
+```bash
+python3 scripts/lasercube_sim.py                  # behave
+python3 scripts/lasercube_sim.py --stall-after 5  # go silent, to trip the watchdog
+python3 scripts/lasercube_sim.py --temperature 45 # report over-temperature
+python3 scripts/lasercube_sim.py --refuse-enable  # decline to enable output
+```
+
+then in another terminal:
+
+```bash
+python3 laserx3.py --output lasercube --lasercube-ip 127.0.0.1
+```
 

@@ -7,18 +7,24 @@ venv/
 env/
 
 # Runtime state — these are created/overwritten as you use the app.
+# Leading slash anchors each to the repo root: an unanchored `settings.json`
+# also matches `.claude/settings.json`, which is tracked config, not state.
 # patterns.json ships with starter patterns; uncomment to keep yours local:
-# patterns.json
-settings.json
-settings.json.tmp
-patterns.json.tmp
+# /patterns.json
+/settings.json
+/settings.json.tmp
+/patterns.json.tmp
 # masks are venue-specific — yours shouldn't follow the repo around
-masks.json
-masks.json.tmp
+/masks.json
+/masks.json.tmp
 
 # User-uploaded ILDA files (keep the sample, ignore the rest)
 ilda/*.ild
 !ilda/spinning_star.ild
+
+# Claude Code: the shared skill and project settings are tracked, but the
+# per-machine permission overrides are not.
+.claude/settings.local.json
 
 # OS cruft
 .DS_Store

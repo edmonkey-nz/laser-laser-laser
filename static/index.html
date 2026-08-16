@@ -46,6 +46,46 @@
   }
   #blank.banner-btn { color: var(--danger); }
   #blank.banner-btn.on { background: var(--danger); color: #fff; }
+  /* Output safety group. Deliberately loud: ARMED means a Class 4 laser is
+     live, so it must be readable across a dark room at a glance. */
+  #safety {
+    display: flex; align-items: center; gap: .5rem;
+    padding: .2rem .5rem; border-radius: 5px;
+    border: 1px solid var(--panel-edge);
+  }
+  #safety.armed { border-color: var(--danger); }
+  #arm.banner-btn { color: var(--ink-dim); }
+  #arm.banner-btn.on {
+    background: var(--danger); color: #fff;
+    animation: armed-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes armed-pulse { 50% { opacity: .55; } }
+  @media (prefers-reduced-motion: reduce) {
+    #arm.banner-btn.on { animation: none; }
+  }
+  #cap-badge {
+    font-size: .6rem; letter-spacing: .14em; color: var(--ink-dim);
+    white-space: nowrap; cursor: default;
+  }
+  #cap-badge b { color: var(--ink); font-weight: 600; }
+  /* Anything above the 5% bring-up ceiling should read as "you did this
+     deliberately", not as normal. */
+  #cap-badge.raised b { color: #ffc46b; }
+  #set-cap { width: 100%; }
+  #set-cap-val { color: var(--ink); }
+  #diag-table {
+    width: 100%; border-collapse: collapse; margin-top: .5rem;
+    font-size: .62rem;
+  }
+  #diag-table[hidden] { display: none; }
+  #diag-table td { padding: .2rem .4rem; border-top: 1px solid var(--panel-edge); }
+  #diag-table td:first-child {
+    color: var(--ink-dim); white-space: nowrap; width: 10em;
+  }
+  #diag-table td.ok   { color: #6ee7a8; }
+  #diag-table td.warn { color: #ffc46b; }
+  #diag-table td.bad  { color: var(--danger); font-weight: 600; }
+  #diag-stamp { color: var(--ink-dim); font-size: .58rem; }
   #open-settings:focus-visible { outline: 2px solid var(--accent); }
   #settings-modal {
     position: fixed; inset: 0; z-index: 20; display: flex;
@@ -386,6 +426,15 @@
 its own window — drag it to a second screen and double-click for fullscreen">
     <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="2" width="14"
       height="9.5" rx="1.5"/><path d="M5.5 14h5"/></svg>MONITOR</button>
+  <div id="safety">
+    <button id="arm" class="banner-btn" title="laser output gate — nothing is
+emitted until you ARM. Always starts disarmed.">DISARMED</button>
+    <!-- Read-only on purpose. You want to see the ceiling at a glance mid-show;
+         you do not want to be able to nudge it with a stray click. Changing it
+         lives in Settings, behind a confirmation. -->
+    <span id="cap-badge" title="output brightness ceiling — change it in
+Settings → Laser output">MAX <b id="cap-val">5%</b></span>
+  </div>
   <button id="blank" class="banner-btn">BLANK</button>
 </header>
 
@@ -609,7 +658,41 @@ its own window — drag it to a second screen and double-click for fullscreen">
       <h2>Settings</h2>
       <button id="close-settings">CLOSE</button>
     </div>
-    <h3 style="margin-top:0">MIDI input</h3>
+    <h3 style="margin-top:0">Laser output</h3>
+    <div class="map-hint">Which device the beam goes to. Changing this
+      <strong>always disarms</strong> — arming is a statement about one
+      specific projector, so it is never carried across a device change.</div>
+    <div class="set-row"><label for="set-output">device</label>
+      <select id="set-output" style="max-width:100%">
+        <option value="none">none — no laser output</option>
+        <option value="helios">Helios DAC (USB)</option>
+        <option value="lasercube">LaserCube (network)</option>
+      </select></div>
+    <div class="set-row"><label>status</label>
+      <span id="output-status">—</span></div>
+    <div class="toggles">
+      <button id="output-test">TEST DEVICE</button>
+    </div>
+    <table id="diag-table" hidden></table>
+
+    <h3>Brightness ceiling</h3>
+    <div class="map-hint">A hard cap on output, applied after everything else
+      — no pattern, audio modulation or MIDI knob can exceed it. It lives here
+      rather than in the header so it cannot be nudged mid-show. Raising it
+      above 5% asks first.
+      <strong>This is a creative limiter, not a safety interlock:</strong> it
+      cannot help against a crash or a driver bug. Only the key switch,
+      shutter, interlock loop and Remote Stop can.</div>
+    <div class="set-row"><label for="set-cap">ceiling</label>
+      <input id="set-cap" type="range" min="0" max="1" step="0.01" value="0.05">
+    </div>
+    <div class="set-row"><label>current</label>
+      <span id="set-cap-val">5%</span></div>
+    <div class="toggles">
+      <button id="cap-safe">SET 5% (BRING-UP)</button>
+    </div>
+
+    <h3>MIDI input</h3>
     <div class="set-row"><label for="midi-port">port</label>
       <select id="midi-port" style="max-width:100%">
         <option value="">— disconnected —</option>
@@ -824,6 +907,131 @@ const blankBtn = document.getElementById("blank");
 let blanked = false;
 blankBtn.addEventListener("click", () =>
   send({ type: "blank", value: !blanked }));
+
+/* ---------------- output safety ---------------- */
+const safetyBox = document.getElementById("safety");
+const armBtn = document.getElementById("arm");
+const capBadge = document.getElementById("cap-badge");
+const capVal = document.getElementById("cap-val");
+const capSlider = document.getElementById("set-cap");
+const capSetVal = document.getElementById("set-cap-val");
+const SAFE_CAP = 0.05;
+let armed = false;
+let cap = SAFE_CAP;
+
+armBtn.addEventListener("click", () => {
+  // Arming is the only action here that can start photons, so make it a
+  // deliberate one. Disarming is always immediate.
+  if (!armed && !confirm(
+      "ARM the laser output?\n\nThe beam goes live on the next frame.")) return;
+  send({ type: "arm", value: !armed });
+});
+
+// Dragging updates the label only. Nothing is sent until release, so a drag
+// across the range never briefly commits a high ceiling on the way past, and
+// the confirmation fires once rather than per pixel.
+capSlider.addEventListener("input", () => {
+  capSetVal.textContent = Math.round(capSlider.value * 100) + "%";
+});
+
+capSlider.addEventListener("change", () => {
+  const v = parseFloat(capSlider.value);
+  if (v > SAFE_CAP && !confirm(
+      `Raise the brightness ceiling to ${Math.round(v * 100)}%?\n\n` +
+      (armed ? "The laser is ARMED — this takes effect immediately.\n\n" : "") +
+      "The 5% default is for alignment and bring-up. Only raise it once " +
+      "the beam path is set and everyone present is wearing rated eyewear.")) {
+    capSlider.value = cap;                    // snap back to the live value
+    capSetVal.textContent = Math.round(cap * 100) + "%";
+    return;
+  }
+  send({ type: "max_brightness", value: v });
+});
+
+document.getElementById("cap-safe").addEventListener("click", () => {
+  send({ type: "max_brightness", value: SAFE_CAP });
+});
+
+const outputSel = document.getElementById("set-output");
+const outputStatus = document.getElementById("output-status");
+let outputPending = false;
+
+outputSel.addEventListener("change", () => {
+  if (armed && !confirm(
+      "The laser is ARMED. Switching output will disarm it. Continue?")) {
+    outputPending = false;
+    return;
+  }
+  outputPending = true;
+  outputStatus.textContent = "switching…";
+  send({ type: "output", value: outputSel.value });
+});
+
+function drawOutput(sf) {
+  const kind = sf.backend || "none";
+  if (document.activeElement !== outputSel) outputSel.value = kind;
+  if (sf.error) {
+    outputStatus.textContent = sf.error;
+    outputStatus.style.color = "var(--danger)";
+  } else if (kind === "none") {
+    outputStatus.textContent = "no output — preview and monitor only";
+    outputStatus.style.color = "";
+  } else {
+    const i = sf.info || {};
+    // The LaserCube reports telemetry; the Helios has none to report.
+    const bits = [kind];
+    if (i.connection) bits.push(i.connection);
+    if (i.battery_pct != null) bits.push(i.battery_pct + "% battery");
+    if (i.temperature_c != null) bits.push(i.temperature_c + "°C");
+    outputStatus.textContent = bits.join(" · ");
+    outputStatus.style.color = (i.temperature_c >= 35) ? "var(--danger)" : "";
+  }
+  if (outputPending && (sf.backend === outputSel.value || sf.error))
+    outputPending = false;
+}
+
+const diagTable = document.getElementById("diag-table");
+let lastDiagT = 0;
+
+document.getElementById("output-test").addEventListener("click", () => {
+  diagTable.hidden = false;
+  diagTable.innerHTML = "<tr><td>testing…</td><td></td></tr>";
+  send({ type: "output_test" });
+});
+
+function drawDiag(sf) {
+  // Only redraw when a new run has actually landed, so the table doesn't
+  // flicker on every 5 Hz state broadcast.
+  if (!sf.diag || sf.diag_t === lastDiagT) return;
+  lastDiagT = sf.diag_t;
+  diagTable.hidden = false;
+  const rows = sf.diag.map(([label, value, sev]) =>
+    `<tr><td>${esc(label)}</td><td class="${sev || ""}">${esc(value)}</td></tr>`);
+  const when = new Date(sf.diag_t * 1000).toLocaleTimeString();
+  rows.push(`<tr><td></td><td id="diag-stamp">read at ${when}</td></tr>`);
+  diagTable.innerHTML = rows.join("");
+}
+
+function drawSafety(s) {
+  const sf = s.safety || {};
+  armed = !!sf.armed;
+  drawOutput(sf);
+  drawDiag(sf);
+  armBtn.classList.toggle("on", armed);
+  armBtn.textContent = armed ? "ARMED" : "DISARMED";
+  safetyBox.classList.toggle("armed", armed);
+  if (typeof sf.cap === "number") {
+    cap = sf.cap;
+    const pct = Math.round(cap * 100) + "%";
+    capVal.textContent = pct;
+    capBadge.classList.toggle("raised", cap > SAFE_CAP);
+    // Don't fight the operator's hand mid-drag.
+    if (document.activeElement !== capSlider) {
+      capSlider.value = cap;
+      capSetVal.textContent = pct;
+    }
+  }
+}
 
 /* ---------------- ILDA ---------------- */
 const ildaSel = document.getElementById("ilda-file");
@@ -1574,7 +1782,8 @@ MAPPABLE.push(["lfo_rate","lfo rate"], ["lfo_depth","lfo depth"],
               // action buttons (momentary, fire on knob/button press)
               ["act_pause", "\u25b6 pause (button)"],
               ["act_stop_spin", "\u25b6 stop spin (button)"],
-              ["act_blank", "\u25b6 blank (button)"]);
+              ["act_blank", "\u25b6 blank (button)"],
+              ["act_disarm", "\u25b6 DISARM laser (button)"]);
 
 const setEls = {
   points: document.getElementById("set-points"),
@@ -1878,6 +2087,7 @@ function onState(s) {
   blankBtn.classList.toggle("on", blanked);
   blankBtn.textContent = blanked ? "UNBLANK" : "BLANK";
   document.getElementById("scope-wrap").classList.toggle("blanked", blanked);
+  drawSafety(s);
   const mi = s.midi || {};
   statusEl.innerHTML =
     `<b>${s.fps.toFixed(0)}</b> fps · ` +

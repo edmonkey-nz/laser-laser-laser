@@ -14,6 +14,7 @@ Keyboard (preview window):
   m/M morph          s/S spin      h hue step    a/A audio amount
   d/D copies +/-     c mono        f/g flip X/Y
   SPACE blank/unblank              ESC/q quit (blanks laser)
+  . disarm laser     > (shift-.) arm laser
 
 Default MIDI CC map (channel-agnostic):
   CC1→ratio A  CC2→ratio B  CC3→morph  CC4→spin  CC5→size
@@ -25,7 +26,7 @@ Default MIDI CC map (channel-agnostic):
   Notes from C1 (36) upward select shapes.
 """
 
-__version__ = "1.4.0"
+__version__ = "1.6.0"
 
 import argparse
 import sys
@@ -36,6 +37,7 @@ import numpy as np
 
 from ilda import IldaLibrary
 from geometry import GeometryCorrection, test_pattern
+from laser_output import NullOutput, SafeOutput, install_panic_handlers
 from mask import MaskFilter
 from masks import MaskBank
 from settings import SettingsStore
@@ -101,10 +103,13 @@ PARAM_RANGES = {key: (lo, hi) for key, lo, hi in CC_MAP.values()}
 # momentary "action" params: mappable like any other, but instead of
 # setting a value, a rising edge (value >= 64) fires a callback. The web
 # UI and MIDI both address these by name so LEARN works identically.
-ACTION_KEYS = ("act_pause", "act_stop_spin", "act_blank")
+ACTION_KEYS = ("act_pause", "act_stop_spin", "act_blank", "act_disarm")
 
 
-def _register_actions(engine):
+def _register_actions(engine, holder):
+    """holder carries a late-bound .out (the SafeOutput), which does not
+    exist yet when MIDI is set up."""
+
     def toggle_pause():
         engine.paused = not engine.paused
 
@@ -115,9 +120,16 @@ def _register_actions(engine):
     def toggle_blank():
         engine.blanked = not engine.blanked
 
+    def disarm():
+        # One-way on purpose: a MIDI accident should never arm a laser.
+        if holder.out:
+            holder.out.disarm()
+            print("[laser] disarmed (MIDI)")
+
     return {"act_pause": toggle_pause,
             "act_stop_spin": stop_spin,
-            "act_blank": toggle_blank}
+            "act_blank": toggle_blank,
+            "act_disarm": disarm}
 
 
 def custom_key_for_cc(custom, cc):
@@ -159,7 +171,8 @@ class MidiInput:
         self.msg_count = 0
         self._caught = {}          # catch-mode: has the knob caught the value?
         self._catch_last = {}      # catch-mode: last raw value seen per param
-        self._actions = _register_actions(engine)
+        self.out = None            # SafeOutput, attached once it exists
+        self._actions = _register_actions(engine, self)
         self._act_last = {}        # action CCs: last value, for edge detection
         names = self.list_ports()
         saved = settings.get("midi_port") if settings else None
@@ -386,7 +399,7 @@ class AudioAnalyzer:
 class Preview:
     """pygame window mirroring the laser output, with keyboard control."""
 
-    def __init__(self, engine, size=700):
+    def __init__(self, engine, size=700, out=None):
         import pygame
         self.pygame = pygame
         pygame.init()
@@ -394,6 +407,7 @@ class Preview:
         self.screen = pygame.display.set_mode((size, size))
         pygame.display.set_caption("Laser! Laser Laser!")
         self.engine = engine
+        self.out = out          # SafeOutput, for the ARM/DISARM keys
         self.font = pygame.font.SysFont("monospace", 13)
 
     def draw(self, frame):
@@ -461,6 +475,12 @@ class Preview:
                     p["flip_y"] = 0.0 if p["flip_y"] > 0.5 else 1.0
                 elif k == pg.K_SPACE:
                     self.engine.blanked = not self.engine.blanked
+                # Panic-off you can hit without the browser focused. Bare `.`
+                # disarms; shift-. arms, so arming is never a one-key slip.
+                elif k == pg.K_PERIOD and self.out:
+                    self.out.set_armed(bool(shift))
+                    print("[laser] ARMED" if self.out.armed
+                          else "[laser] disarmed")
         return True
 
     def close(self):
@@ -486,6 +506,25 @@ def main():
     ap.add_argument("--version", action="version",
                     version=f"Laser! Laser Laser! {__version__}")
     ap.add_argument("--laser", action="store_true", help="output to Helios DAC")
+    ap.add_argument("--output", choices=("none", "helios", "lasercube"),
+                    default=None,
+                    help="output backend (default none; --laser is an alias "
+                         "for --output helios)")
+    ap.add_argument("--lasercube-ip", default=None,
+                    help="LaserCube address (default: discover by broadcast)")
+    ap.add_argument("--lasercube-dry-run", action="store_true",
+                    help="pack and rate-control but send nothing — validates "
+                         "the whole path with zero photons")
+    ap.add_argument("--lasercube-point-order", choices=("xyrgb", "rgbxy"),
+                    default="xyrgb",
+                    help="wire field order (default xyrgb; see "
+                         "lasercube_output.py's module docstring)")
+    ap.add_argument("--list-lasercubes", action="store_true",
+                    help="discover LaserCubes on the network and exit")
+    ap.add_argument("--max-brightness", type=float, default=None,
+                    help="hard ceiling on output brightness, 0..1 "
+                         "(default 0.05). A creative limiter, NOT a safety "
+                         "interlock — see docs/lasercubeoutput.md §4.4")
     ap.add_argument("--preview", action="store_true", help="pygame preview window")
     ap.add_argument("--points", type=int, default=800, help="points per frame")
     ap.add_argument("--pps", type=int, default=30000, help="DAC points per second")
@@ -510,6 +549,22 @@ def main():
         import mido
         print("\n".join(mido.get_input_names()) or "(none)")
         return
+
+    if args.list_lasercubes:
+        from lasercube_output import discover
+        found = discover()
+        for ip, info in found:
+            print(f"{ip}  fw {info.get('fw','?')}  "
+                  f"{info.get('connection','?')}  "
+                  f"battery {info.get('battery_pct','?')}%  "
+                  f"{info.get('temperature_c','?')}°C  "
+                  f"max {info.get('max_dac_rate','?')} pps")
+        print(f"({len(found)} found)" if found else "(none found)")
+        return
+
+    if args.output is None:
+        args.output = "helios" if args.laser else "none"
+    args.laser = args.output != "none"
 
     if not args.laser and not args.preview and not args.web:
         args.preview = True  # sensible default: don't fire a laser by surprise
@@ -547,18 +602,67 @@ def main():
                     ilda_lib=ilda_lib, vec=vec, settings=settings,
                     midi=midi, geom=geom, mask=mask, mask_bank=mask_bank)
 
-    dac = None
-    if args.laser:
-        from helios import HeliosDAC
-        dac = HeliosDAC(0)
-        print(f"[laser] Helios DAC ready ({dac.num_devices} device(s))")
-        if web:
-            web.status["laser"] = True
+    # ---- output backend + safety layer ----
+    # Literal if/elif with direct imports so PyInstaller can trace them;
+    # importlib here would silently drop a backend from the bundle. Both
+    # backends are imported lazily so a missing Helios library never stops
+    # the LaserCube path working, or vice versa.
+    def make_backend(kind):
+        if kind == "helios":
+            from helios import HeliosOutput
+            b = HeliosOutput(0)
+            print(f"[laser] Helios DAC ready ({b.num_devices} device(s))")
+            return b
+        if kind == "lasercube":
+            from lasercube_output import LaserCubeOutput
+            return LaserCubeOutput(ip=args.lasercube_ip,
+                                   pps=engine.pps,
+                                   point_order=args.lasercube_point_order,
+                                   dry_run=args.lasercube_dry_run)
+        return NullOutput()
 
-    preview = Preview(engine) if args.preview else None
+    # A saved output choice applies when the CLI didn't name one, exactly like
+    # pps/points above.
+    explicit = args.output != "none"
+    kind = args.output if explicit else str(settings.get("output", "none"))
+    try:
+        backend = make_backend(kind)
+    except Exception as e:
+        # An explicit --output/--laser is a statement about which projector is
+        # plugged in. Failing that silently and running with no output would
+        # let someone believe the laser is live when nothing is connected, so
+        # it is fatal. A *remembered* choice is only a preference, and falls
+        # back — you should be able to start the app after unplugging.
+        if explicit:
+            print(f"[laser] could not open {kind}: {e}")
+            return 1
+        print(f"[laser] could not open saved output {kind}: {e} "
+              "— starting with no output")
+        backend, kind = NullOutput(), "none"
+    args.laser = kind != "none"
+
+    cap = (args.max_brightness if args.max_brightness is not None
+           else float(settings.get("max_brightness", 0.05)))
+    out = SafeOutput(backend, max_brightness=cap)
+    dac = backend if args.laser else None    # for the existing `if dac:` HUD
+    midi.out = out
+    if web:
+        web.status["laser"] = args.laser
+        web.out = out
+        web.make_backend = make_backend
+
+    preview = Preview(engine, out=out) if args.preview else None
 
     print(f"[run] {engine.n_points} pts @ {engine.pps} pps ≈ "
           f"{engine.pps / engine.n_points:.0f} fps — Ctrl-C to quit")
+    if args.laser:
+        print(f"[laser] DISARMED — ceiling {out.max_brightness:.0%}. "
+              "Nothing is emitted until you ARM.")
+
+    # Installed last, so nothing set up above displaces the handlers. Without
+    # the SIGTERM handler a `kill` skips the finally below entirely and the
+    # DAC keeps replaying its last frame.
+    install_panic_handlers(out)
 
     last = time.monotonic()
     fps_ema = 0.0
@@ -593,14 +697,17 @@ def main():
             if web:
                 web.publish(frame, a, fps_ema)
 
-            if dac:
-                # write_frame blocks on GetStatus, which paces us to the DAC
-                out_frame = hw_orient(frame, engine.hw_flip_x,
-                                      engine.hw_flip_y)
-                out_frame = geom.apply(out_frame)
-                if not dac.write_frame(out_frame, eff_pps):
-                    print("[laser] frame dropped (DAC busy)")
-            else:
+            # hw_orient and geom are DAC-only, so the preview stays a true,
+            # uncorrected reference. SafeOutput's arm gate and brightness
+            # ceiling are applied inside out.write(), downstream of both.
+            out_frame = hw_orient(frame, engine.hw_flip_x, engine.hw_flip_y)
+            out_frame = geom.apply(out_frame)
+            if not out.write(out_frame, eff_pps) and dac:
+                print("[laser] frame dropped (DAC busy)")
+
+            if not out.paces_loop:
+                # Helios paces us by blocking on GetStatus; everything else
+                # has to keep its own time.
                 frame_dt = eff_points / max(eff_pps, 1000)
                 spare = frame_dt - (time.monotonic() - now)
                 if spare > 0:
@@ -609,8 +716,8 @@ def main():
         pass
     finally:
         vec.stop_camera()
+        out.close()
         if dac:
-            dac.close()
             print("[laser] blanked and closed")
         if audio:
             audio.close()
@@ -621,4 +728,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main() or 0)

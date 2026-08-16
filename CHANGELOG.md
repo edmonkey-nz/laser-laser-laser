@@ -3,6 +3,131 @@
 All notable changes to this project are documented here. This project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.6.0] — 2026-08-17
+
+LaserCube network output, and a runtime output selector. The LaserCube path is
+deliberately ringfenced: `lasercube_output.py` is a standalone module that
+imports nothing from this project, and the Helios path is untouched except for
+gaining diagnostics. Both backends sit under the same `SafeOutput` wrapper, so
+the arm gate, brightness ceiling, watchdog and blank-on-exit apply identically
+and neither backend can bypass them.
+
+### Added
+- **LaserCube / LaserCube Ultra output over the network** (`--output
+  lasercube`). UDP, pure Python, no C toolchain. `write()` never touches a
+  socket — it hands the frame to a sender thread through a lock-guarded slot,
+  so the render thread can never be blocked by the network. The sender paces
+  to the DAC rate and keeps the device buffer topped up rather than sending
+  one burst per frame, and drops frames rather than blocking under
+  backpressure.
+- **Output device selector in Settings** — switch between none, Helios (USB)
+  and LaserCube (network) live, without restarting. The choice persists.
+  **Switching always disarms**: arming is a statement about one specific
+  projector and is never carried across a device change. If the new device
+  fails to open, output falls back to none rather than leaving a dead backend
+  in place.
+- **TEST DEVICE diagnostics** (Settings → Laser output). Queries the attached
+  device and reports what it says about itself — for a LaserCube: firmware,
+  serial, model, connection type, temperature and thermal warnings, interlock
+  state, output state, power source, scan rate and maximum, buffer occupancy,
+  the device's own packet-error count, and our frame sent/dropped/error
+  counters. For a Helios: device count and link status, and an explicit note
+  that it reports no telemetry. Emits nothing, so it is safe to press at any
+  time.
+- **`scripts/lasercube_sim.py`** — a fake LaserCube that answers on the real
+  ports, so discovery, framing, throttling, the watchdog, arm-refusal and
+  reconnect can all be exercised with zero photons. It can be told to
+  misbehave: `--stall-after`, `--drop`, `--refuse-enable`, `--tiny-buffer`,
+  `--temperature`, `--interlock-open`, `--packet-errors`. It builds its
+  responses independently of the client's parser, so a shared offset error
+  cannot pass unnoticed.
+- `--list-lasercubes` discovers units on the network and prints their status.
+  `--lasercube-dry-run` packs and rate-controls while transmitting nothing.
+  `--lasercube-ip` skips discovery; `--lasercube-point-order` swaps the wire
+  field order without a code change, if the hardware disagrees with the spec.
+- **Thermal and interlock awareness**: the device's own temperature, thermal
+  warnings and interlock state are read and surfaced, and `enable()` refuses
+  while the device reports over-temperature.
+
+- **`docs/PORTING.md`** — how to adopt the output safety layer in the sibling
+  projects, with the per-project adaptations each needs, and the constraints
+  that keep the shared files copyable.
+- **`.claude/skills/verify-output/`** — the verification procedure for changes
+  to the output path, including the simulator workflow and the invariants to
+  re-check.
+
+### Changed
+- **The brightness ceiling moved from the header to Settings**, behind a
+  confirmation when raising it above 5%. It was too easy to nudge mid-show
+  from the header. The header now shows it read-only, in amber when above 5%.
+- **Arming can now fail.** If the backend has a hardware output gate and the
+  device refuses, the app stays disarmed and says so, rather than displaying
+  ARMED over a device that is dark. `enable()` on the LaserCube reads the
+  state back from the device instead of trusting an unacknowledged UDP send.
+
+### Fixed
+- `docs/lasercubeoutput.md` gave the LaserCube's wavelengths as 445/520/638
+  nm. The Ultra is **455 nm blue, 525 nm green, 638 nm red** — an eyewear
+  rating is not a place for an approximate number.
+- The same document claimed native 12-bit colour as an advantage of the
+  network path. The wire carries 12-bit fields but the hardware does 16.7
+  million colours — 8 bits per channel, the same as the Helios. There is no
+  colour-depth win.
+- Every remaining `[VERIFY]` item in the protocol spec is resolved and cited
+  except stream-underrun behaviour, which only hardware can answer.
+
+## [1.5.0] — 2026-08-16
+
+Output safety hardening. This release implements the mandatory requirements
+in `docs/lasercubeoutput.md` §4 for the Helios path, in a shared module
+(`laser_output.py`) written to be copied into the sibling laser projects
+rather than reimplemented in each. None of these are safety devices — the key
+switch, aperture shutter, interlock loop and Remote Stop remain the only
+actual safety layer.
+
+### Added
+- **ARM gate**: the laser output starts **disarmed** and emits nothing until
+  you arm it — from the header ARM button, or `shift-.` in the preview
+  window. Disarming is instant, with no crossfade, and available from the
+  same button, `.` in the preview, or a new `act_disarm` MIDI action you can
+  LEARN onto any pad. Arm state is deliberately never persisted: every start
+  is disarmed, however the last session ended. Note that "disarmed" means
+  *actively streaming darkness*, not silence — a DAC that simply stops being
+  fed repeats its last frame forever.
+- **Brightness ceiling**: a hard cap on output, applied at the final packing
+  stage after every scene, mask and geometry transform, so nothing upstream —
+  pattern load, audio modulation, MIDI — can exceed it. **Defaults to 5%**;
+  set it with the header MAX slider, the one-click 5% button, or
+  `--max-brightness`, and it persists in `settings.json`. This is a creative
+  limiter, not a safety interlock: it cannot help against a crash or a driver
+  bug. It is separate from the existing `brightness` parameter, which stays
+  exactly as it was.
+- **Watchdog**: a daemon thread blanks the output if the render loop stops
+  feeding it — a GC pause, a deadlock, a logic bug. The stall threshold
+  adapts to the frame time (`max(250 ms, 3 × points/pps)`) so slow, legitimate
+  frames at low PPS don't false-trip it.
+- **Blank on every exit path**: SIGINT, SIGTERM and `atexit` handlers, plus a
+  context manager. **SIGTERM was the real gap** — without a handler, `kill`
+  terminated the process outright, the teardown never ran, and the DAC sat
+  replaying its last frame.
+- `--output {none,helios}` selects the backend; `--laser` remains an alias for
+  `--output helios`.
+- `laser_output.py`, a project-independent module (stdlib + numpy only,
+  Python 3.9 compatible) holding the `LaserOutput` protocol, `NullOutput`,
+  the `SafeOutput` wrapper and the panic handlers.
+
+- **`docs/SAFETY.md`**: what the software does about safety, what it
+  explicitly does not, the daily operating procedure, the hardware bring-up
+  checklist, the rules for changing anything on the DAC path, and an honest
+  list of known gaps.
+
+### Fixed
+- `HeliosDAC` gained a real `blank()` primitive — a dark frame written in
+  *repeat* mode, so the DAC keeps emitting darkness even if the process dies
+  immediately afterwards. `close()` now blanks, settles and then releases.
+- `HeliosDAC.stop()` no longer swallows every exception silently. A blank that
+  failed is now reported loudly, which is the whole point of the call.
+
 ## [1.4.0] — 2026-08-14
 
 ### Added

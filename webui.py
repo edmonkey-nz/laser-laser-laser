@@ -16,6 +16,10 @@ Client → server (JSON):
   {"type":"set","key":"size","value":0.8}
   {"type":"shape","index":2}
   {"type":"blank","value":true}
+  {"type":"arm","value":true}                (laser output gate; never persisted)
+  {"type":"max_brightness","value":0.05}     (hard output ceiling, 0..1)
+  {"type":"output","value":"helios"}         (switch backend; always disarms)
+  {"type":"output_test"}                     (query device diagnostics)
   {"type":"pattern_save","name":"triad"}     (snapshots current params)
   {"type":"pattern_load","name":"triad"}
   {"type":"pattern_delete","name":"triad"}
@@ -53,6 +57,9 @@ from patterns import PatternBank
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
+#: Selectable output backends. "none" is a real choice, not an error state.
+OUTPUT_KINDS = ("none", "helios", "lasercube")
+
 
 class WebUI:
     def __init__(self, engine, port=8080, host="0.0.0.0", downsample=2,
@@ -73,6 +80,11 @@ class WebUI:
         self.mask = mask or MaskFilter()
         self.mask_bank = mask_bank or MaskBank(
             os.path.join(HERE, "masks.json"))
+        self.out = None              # SafeOutput; attached once it exists
+        self.make_backend = None     # callable(kind) -> backend, from laserx3
+        self.out_error = None        # last output-switch failure, for the UI
+        self.diag = None             # last diagnostics run, for the UI
+        self.diag_t = 0.0
         self._midi_ports = []
         self._midi_ports_t = 0.0
         self._latest = None          # packed frame bytes
@@ -169,6 +181,18 @@ class WebUI:
                         "learn": self.bank.learn_target,
                         "xfade": self.engine.xfade,
                         "paused": self.engine.paused,
+                        "safety": {
+                            "armed": bool(self.out and self.out.armed),
+                            "cap": (self.out.max_brightness
+                                    if self.out else 1.0),
+                            "backend": self.out.name if self.out else "none",
+                            "kinds": list(OUTPUT_KINDS),
+                            "error": self.out_error,
+                            "info": getattr(self.out.backend, "info", None)
+                                    if self.out else None,
+                            "diag": self.diag,
+                            "diag_t": self.diag_t,
+                        },
                         "midi": {
                             "port": self.midi.port_name if self.midi
                                     else "none",
@@ -305,6 +329,36 @@ class WebUI:
                 p["shape"] = idx
         elif t == "blank":
             self.engine.blanked = bool(msg.get("value"))
+        elif t == "arm":
+            # Arm state is deliberately never persisted: every start is
+            # disarmed, no matter how the last session ended.
+            if self.out:
+                self.out.set_armed(bool(msg.get("value")))
+        elif t == "max_brightness":
+            if self.out:
+                self.out.set_max_brightness(msg.get("value", 0.05))
+                self.settings.set("max_brightness", self.out.max_brightness)
+        elif t == "output":
+            # Switching the output device always disarms — see
+            # SafeOutput.swap_backend. The choice persists; the arm state
+            # never does.
+            kind = str(msg.get("value", "none"))
+            if self.out and self.make_backend and kind in OUTPUT_KINDS:
+                ok, why = self.out.swap_backend(
+                    lambda: self.make_backend(kind), kind)
+                self.settings.set("output", kind if ok else "none")
+                self.status["laser"] = ok and kind != "none"
+                self.out_error = None if ok else why
+                self.diag = None
+        elif t == "output_test":
+            # Read-only device query. Emits nothing, so it is safe to press
+            # at any time, armed or not.
+            if self.out:
+                try:
+                    self.diag = [list(r) for r in self.out.diagnostics()]
+                except Exception as e:
+                    self.diag = [["error", str(e), "bad"]]
+                self.diag_t = time.time()
         elif t == "pattern_save":
             self.bank.save(
                 msg.get("name", ""), dict(p),
