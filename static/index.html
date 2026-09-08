@@ -165,22 +165,32 @@
 
   main {
     flex: 1; display: grid; gap: 1rem; padding: 1rem;
-    grid-template-columns: 250px minmax(280px, 1fr) auto;
-    align-items: start; max-width: 1560px; margin: 0 auto; width: 100%;
+    /* the stage floor is the preview's own width: let it fall below
+       that and the beam view shrinks again on the way to fitting a
+       fourth column, which defeats the point of sizing it */
+    grid-template-columns: 250px minmax(359px, 1fr) auto;
+    align-items: start; max-width: 1680px; margin: 0 auto; width: 100%;
   }
   #stage { min-width: 0; }
-  #scope-wrap { max-width: min(100%, 479px); margin: 0 auto; }
+  /* preview: 359px, a quarter down from the old 479 — the beam view was
+     using width the parameter columns needed more */
+  #scope-wrap { max-width: min(100%, 359px); margin: 0 auto; }
   #scope.masking { cursor: crosshair; }
   #controls {
-    display: grid; grid-template-columns: repeat(3, minmax(200px, 232px));
+    display: grid; grid-template-columns: repeat(4, minmax(186px, 224px));
     gap: .8rem; align-items: start;
   }
-  @media (max-width: 1350px) {
-    #controls { grid-template-columns: repeat(2, minmax(200px, 1fr)); }
+  /* Four columns need roughly 1450px once the bank and the stage have taken
+     theirs; below that they drop out one at a time rather than squeezing. */
+  @media (max-width: 1450px) {
+    #controls { grid-template-columns: repeat(3, minmax(190px, 1fr)); }
   }
   @media (max-width: 1150px) {
+    #controls { grid-template-columns: repeat(2, minmax(190px, 1fr)); }
+  }
+  @media (max-width: 980px) {
     main { grid-template-columns: 1fr 300px; }
-    #controls { grid-template-columns: 1fr; }
+    #controls { grid-template-columns: repeat(2, minmax(180px, 1fr)); }
     #bank { grid-column: 1 / -1; order: 3; }
     #pat-list { max-height: 200px; }
   }
@@ -348,6 +358,45 @@
     font-size: .68rem; font-weight: 600; letter-spacing: .22em;
     color: var(--ink-dim); text-transform: uppercase; margin-bottom: .7rem;
   }
+  /* ---- per-panel enable/bypass switch (top right of the heading) ---- */
+  .panel h2.with-switch {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: .5rem;
+  }
+  .pane-switch {
+    background: var(--track); color: var(--ink-dim);
+    border: 1px solid var(--panel-edge); border-radius: 3px;
+    padding: .12rem .4rem; font: inherit; font-size: .58rem;
+    letter-spacing: .12em; cursor: pointer; text-transform: uppercase;
+  }
+  .pane-switch.on { background: var(--accent); color: #0a0c11; font-weight: 600;
+                    border-color: transparent; }
+  .pane-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  /* a bypassed panel dims its controls, so it is obvious at a glance that
+     the faders in it are not reaching the beam */
+  .panel.bypassed .fader, .panel.bypassed .toggles,
+  .panel.bypassed .osc-row, .panel.bypassed .aud-routes,
+  .panel.bypassed .meters, .panel.bypassed .scope-modes { opacity: .35; }
+  /* ---- panels tied to one shape ----
+     Dimmed, deliberately not disabled. Picking an ILDA file, drawing a
+     custom polygon or starting the vectoriser is what *switches* to that
+     shape (see webui.py's ilda_select / custom_points_set), so locking
+     these until their shape is current would make them unreachable. */
+  .panel[data-shape].shape-inactive > *:not(h2) { opacity: .38; }
+  .panel[data-shape].shape-inactive > h2 { color: #3d4657; }
+  .scope-modes.shape-inactive { opacity: .38; }
+
+  /* ---- master reset ---- */
+  .master-reset {
+    width: 100%; background: var(--track); color: var(--ink);
+    border: 1px solid var(--panel-edge); border-radius: 4px;
+    padding: .5rem .3rem; font: inherit; font-size: .72rem;
+    letter-spacing: .1em; cursor: pointer; text-transform: uppercase;
+    margin-bottom: .8rem;
+  }
+  .master-reset:hover { border-color: var(--accent); color: var(--accent); }
+  .master-reset.armed { background: var(--accent); color: #0a0c11; font-weight: 600; }
+  .master-reset:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   /* ---- collapsible panels (Text, Mask) ---- */
   .panel.collapsible > h2 { margin-bottom: 0; }
   .panel.collapsible:not(.collapsed) > h2 { margin-bottom: .7rem; }
@@ -392,19 +441,27 @@
   }
   input[type=range]::-webkit-slider-runnable-track { height: 4px; background: var(--track); border-radius: 2px; }
   input[type=range]::-moz-range-track { height: 4px; background: var(--track); border-radius: 2px; }
+  /* a slim marker rather than a slab: the knob only has to say where the
+     value sits, and at 10px wide it was reading as the loudest thing in
+     the panel. margin-top centres it on the 4px track. */
   input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none; width: 10px; height: 20px; margin-top: -8px;
-    background: var(--accent); border-radius: 2px;
+    -webkit-appearance: none; width: 4px; height: 15px; margin-top: -5.5px;
+    background: var(--ink); border-radius: 1px;
   }
   input[type=range]::-moz-range-thumb {
-    width: 10px; height: 20px; background: var(--accent); border: none; border-radius: 2px;
+    width: 4px; height: 15px; background: var(--ink); border: none; border-radius: 1px;
   }
+  input[type=range]:hover::-webkit-slider-thumb { background: var(--accent); }
+  input[type=range]:hover::-moz-range-thumb { background: var(--accent); }
 
   /* ---- audio meters ---- */
   .meters { display: flex; gap: .8rem; height: 56px; margin-top: .3rem; }
   .meter { flex: 1; display: flex; flex-direction: column; align-items: center; gap: .3rem; }
   .meter .bar { width: 100%; flex: 1; background: var(--track); border-radius: 3px; position: relative; overflow: hidden; }
-  .meter .bar i { position: absolute; left: 0; right: 0; bottom: 0; height: 0%; background: var(--ink); border-radius: 3px; transition: height 60ms linear; }
+  /* the level fill was full --ink, which made three bright bars the
+     brightest thing on the page while they bounced */
+  .meter .bar i { position: absolute; left: 0; right: 0; bottom: 0; height: 0%;
+    background: var(--ink-dim); border-radius: 3px; transition: height 60ms linear; }
   .meter span { font-size: .65rem; color: var(--ink-dim); letter-spacing: .15em; }
 
 
@@ -529,6 +586,10 @@ Settings → Laser output">MAX <b id="cap-val">5%</b></span>
           <button id="stop-spin">STOP SPIN</button>
         </div>
       </div>
+      <button class="master-reset" id="master-reset"
+              title="every parameter back to its default">reset all</button>
+    </div>
+    <div class="ccol">
       <div class="panel">
         <h2>Position</h2>
         <div id="pos"></div>
@@ -537,18 +598,30 @@ Settings → Laser output">MAX <b id="cap-val">5%</b></span>
           <button id="t-flip_y">FLIP Y</button>
         </div>
       </div>
-    </div>
-    <div class="ccol">
       <div class="panel">
-        <h2>Duplicator</h2>
+        <h2 class="with-switch">Effects<button class="pane-switch" data-pane="fx_on">on</button></h2>
+        <div id="fx"></div>
+      </div>
+      <div class="panel">
+        <h2 class="with-switch">Duplicator<button class="pane-switch" data-pane="dup_on">on</button></h2>
         <div id="dup"></div>
         <div class="toggles">
           <button id="t-dup_mirror_x">MIRROR X</button>
           <button id="t-dup_mirror_y">MIRROR Y</button>
         </div>
       </div>
+    </div>
+    <div class="ccol">
       <div class="panel">
-        <h2>Audio</h2>
+        <h2>Colour</h2>
+        <div class="hue-swatches" id="hue-swatches"></div>
+        <div id="col"></div>
+        <div class="toggles">
+          <button id="t-mono">MONO</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h2 class="with-switch">Audio<button class="pane-switch" data-pane="audio_off">on</button></h2>
         <div id="aud"></div>
         <div class="meters">
           <div class="meter"><div class="bar"><i id="m-bass"></i></div><span>BASS</span></div>
@@ -566,49 +639,30 @@ Settings → Laser output">MAX <b id="cap-val">5%</b></span>
         <div class="scope-modes" id="scope-modes"></div>
       </div>
       <div class="panel">
-        <h2>Colour</h2>
-        <div class="hue-swatches" id="hue-swatches"></div>
-        <div id="col"></div>
-        <div class="toggles">
-          <button id="t-mono">MONO</button>
-        </div>
-      </div>
-    </div>
-    <div class="ccol">
-      <div class="panel">
-        <h2>Oscillator</h2>
+        <h2 class="with-switch">Oscillator<button class="pane-switch" data-pane="lfo_on">on</button></h2>
         <div class="osc-row">
           <select id="lfo-target" title="parameter the oscillator sweeps"></select>
           <select id="lfo-wave" title="oscillator waveform"></select>
         </div>
         <div id="lfo"></div>
       </div>
-      <div class="panel">
+    </div>
+    <div class="ccol">
+      <div class="panel" data-shape="wave">
         <h2>Wave shape</h2>
         <div class="osc-row">
           <select id="wave-type" title="waveform for the 'wave' shape"></select>
         </div>
         <div class="map-hint" style="margin:0">cycles = ratio A · amplitude/duty = morph</div>
       </div>
-      <div class="panel">
+      <div class="panel" data-shape="custom">
         <h2>Custom Shape</h2>
         <div class="ilda-row">
           <button id="custom-edit" style="flex:1">EDIT POINTS…</button>
         </div>
         <div class="ilda-status" id="custom-hint">0 points saved</div>
       </div>
-      <div class="panel">
-        <h2>Vectoriser</h2>
-        <div class="ilda-row">
-          <select id="vec-cam"><option value="">source: off</option></select>
-          <button id="vec-upload" title="or drag an image anywhere onto the page">IMAGE</button>
-          <input id="vec-input" type="file"
-                 accept=".png,.jpg,.jpeg,.webp,.bmp,.gif" hidden>
-        </div>
-        <div id="vec"></div>
-        <div class="ilda-status" id="vec-status"></div>
-      </div>
-      <div class="panel">
+      <div class="panel" data-shape="ilda">
         <h2>ILDA</h2>
         <div class="ilda-row">
           <select id="ilda-file"><option value="">— no file —</option></select>
@@ -623,7 +677,17 @@ Settings → Laser output">MAX <b id="cap-val">5%</b></span>
         </div>
         <div class="ilda-status" id="ilda-status"></div>
       </div>
-
+      <div class="panel" data-shape="vector">
+        <h2>Vectoriser</h2>
+        <div class="ilda-row">
+          <select id="vec-cam"><option value="">source: off</option></select>
+          <button id="vec-upload" title="or drag an image anywhere onto the page">IMAGE</button>
+          <input id="vec-input" type="file"
+                 accept=".png,.jpg,.jpeg,.webp,.bmp,.gif" hidden>
+        </div>
+        <div id="vec"></div>
+        <div class="ilda-status" id="vec-status"></div>
+      </div>
       <div class="panel">
         <h2>Per-pattern PPS / points</h2>
         <div class="ovr-row">
@@ -789,6 +853,17 @@ const FADERS = {
     ["sweep_y",       "sweep y",     0, 1, 0.001],
     ["sweep_y_speed", "y speed",     0, 1, 0.001],
   ],
+  fx: [
+    ["warp_amt",    "ripple",      0, 1, 0.001],
+    ["warp_freq",   "ripples",     1, 12, 1],
+    ["warp_speed",  "ripple spd",  0, 1, 0.001],
+    ["tilt_x",      "tilt x",      0, 1, 0.001],
+    ["tilt_y",      "tilt y",      0, 1, 0.001],
+    ["tumble",      "tumble",      0, 1, 0.001],
+    ["persp",       "perspective", 0, 1, 0.001],
+    ["chase_amt",   "comet",       0, 1, 0.001],
+    ["chase_speed", "comet spd",   0, 1, 0.001],
+  ],
   dup: [
     ["dup_count",  "copies",  1, 6, 1],
     ["dup_spread", "spread",  0, 1, 0.001],
@@ -902,6 +977,72 @@ for (const key of TOGGLES) {
   });
   toggleBtns[key] = b;
 }
+
+/* ---------------- shape-specific panels ---------------- */
+/* Panels that only do anything for one shape are dimmed when another is
+   selected. Dimmed, not disabled: choosing an ILDA file, drawing a custom
+   polygon or starting the vectoriser is what switches the engine to that
+   shape in the first place, so locking them would make those shapes
+   unreachable. This is a legibility cue, not a gate. */
+const shapePanels = [...document.querySelectorAll(".panel[data-shape]")];
+function updateShapePanels(current) {
+  for (const p of shapePanels)
+    p.classList.toggle("shape-inactive", p.dataset.shape !== current);
+  // looked up here rather than cached: the module-level scopeModesEl is
+  // declared further down the file, and this must not depend on that order
+  const sm = document.getElementById("scope-modes");
+  if (sm) sm.classList.toggle("shape-inactive", current !== "scope");
+}
+
+/* ---------------- per-panel enable/bypass switches ---------------- */
+/* Each switch drives one engine key, so the bypass happens in the render
+   loop rather than in the browser — MIDI and the preview keyboard see the
+   same state. "audio_off" is inverted: the Audio panel already had a kill
+   switch, and a second one that disagreed with it would be worse than no
+   switch at all. */
+const paneSwitches = [...document.querySelectorAll(".pane-switch")];
+const paneInverted = key => key === "audio_off";
+for (const b of paneSwitches) {
+  b.addEventListener("click", () => {
+    const key = b.dataset.pane;
+    const raw = (lastP[key] || 0) > 0.5;
+    const enabled = paneInverted(key) ? !raw : raw;
+    const next = !enabled;                       // what the user is asking for
+    send({ type: "set", key,
+           value: (paneInverted(key) ? !next : next) ? 1 : 0 });
+  });
+}
+function updatePaneSwitches(p) {
+  for (const b of paneSwitches) {
+    const key = b.dataset.pane;
+    const raw = (p[key] || 0) > 0.5;
+    const enabled = paneInverted(key) ? !raw : raw;
+    b.classList.toggle("on", enabled);
+    b.textContent = enabled ? "on" : "off";
+    const panel = b.closest(".panel");
+    if (panel) panel.classList.toggle("bypassed", !enabled);
+  }
+}
+
+/* ---------------- master reset ---------------- */
+/* Two-step: the first click arms it, the second does it. A reset throws
+   away whatever the user was in the middle of building, and this button
+   sits in the same column as the faders, so a single stray click should
+   not be able to wipe a setup mid-show. */
+const masterReset = document.getElementById("master-reset");
+let resetArmed = null;
+function disarmReset() {
+  clearTimeout(resetArmed); resetArmed = null;
+  masterReset.classList.remove("armed");
+  masterReset.textContent = "reset all";
+}
+masterReset.addEventListener("click", () => {
+  if (resetArmed) { send({ type: "params_reset" }); disarmReset(); return; }
+  masterReset.classList.add("armed");
+  masterReset.textContent = "press again to reset";
+  resetArmed = setTimeout(disarmReset, 3000);
+});
+masterReset.addEventListener("blur", disarmReset);
 
 const blankBtn = document.getElementById("blank");
 let blanked = false;
@@ -1191,8 +1332,11 @@ function renderBank(names, bindings, learn) {
 }
 
 /* ---------------- oscillator (LFO) ---------------- */
+/* mirrors shapes.LFO_TARGETS — these are NOT sent over the wire, so
+   they must be kept in step with the Python list by hand. */
 const LFO_TARGETS = ["morph","size","hue","ratio A","ratio B","spin",
-                     "pos X","pos Y","dup spread","dotify"];
+                     "pos X","pos Y","dup spread","dotify",
+                     "ripple","tilt y","comet","falloff"];
 const LFO_WAVES = ["sine","triangle","square","saw","random"];
 const lfoTargetSel = document.getElementById("lfo-target");
 const lfoWaveSel = document.getElementById("lfo-wave");
@@ -1646,8 +1790,10 @@ ovrPps.addEventListener("change", sendOverride);
 ovrPoints.addEventListener("change", sendOverride);
 
 /* ---------------- audio routing + wave type ---------------- */
+/* mirrors shapes.AUDIO_DESTS — same hand-sync caveat as LFO_TARGETS. */
 const AUDIO_DESTS = ["off","size","morph","brightness","hue","spin",
-                     "dup spread","dotify","pos X","pos Y","ratio A"];
+                     "dup spread","dotify","pos X","pos Y","ratio A",
+                     "ripple","comet","perspective","falloff"];
 const WAVE_TYPES2 = ["sine","triangle","saw","square","pulse"];
 const audSels = {
   aud_bass_dest: document.getElementById("aud-bass"),
@@ -1963,6 +2109,7 @@ function onState(s) {
   if (s.type !== "state") return;
   if (shapeBtns.length !== s.shapes.length) buildShapes(s.shapes);
   shapeBtns.forEach((b, i) => b.classList.toggle("active", i === (s.p.shape|0)));
+  updateShapePanels(s.shapes[s.p.shape|0]);
   for (const [key, ui] of Object.entries(inputs)) {
     if (key === dragging || !(key in s.p)) continue;
     ui.range.value = s.p[key];
@@ -2082,6 +2229,7 @@ function onState(s) {
   }
   for (const key of TOGGLES)
     toggleBtns[key].classList.toggle("active", s.p[key] > 0.5);
+  updatePaneSwitches(s.p);
   sizeLinked = (s.p.size_link || 0) > 0.5;
   blanked = !!s.blanked;
   blankBtn.classList.toggle("on", blanked);

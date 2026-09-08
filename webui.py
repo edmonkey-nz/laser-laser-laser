@@ -16,6 +16,7 @@ Client → server (JSON):
   {"type":"set","key":"size","value":0.8}
   {"type":"shape","index":2}
   {"type":"blank","value":true}
+  {"type":"params_reset"}                    (master reset: all params to defaults)
   {"type":"arm","value":true}                (laser output gate; never persisted)
   {"type":"max_brightness","value":0.05}     (hard output ceiling, 0..1)
   {"type":"output","value":"helios"}         (switch backend; always disarms)
@@ -327,6 +328,9 @@ class WebUI:
             idx = int(msg.get("index", 0))
             if 0 <= idx < len(SHAPE_NAMES):
                 p["shape"] = idx
+        elif t == "params_reset":
+            # master reset — every parameter back to factory defaults
+            self.engine.reset_params()
         elif t == "blank":
             self.engine.blanked = bool(msg.get("value"))
         elif t == "arm":

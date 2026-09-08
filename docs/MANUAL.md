@@ -69,10 +69,11 @@ way out).
 
 ### Shapes
 
-Seven generated shapes plus four external sources (ILDA, vectoriser,
+Ten generated shapes plus four external sources (ILDA, vectoriser,
 text, and a hand-drawn custom polygon — covered under *Sources* below).
 The maths shapes — lissajous,
-rose, hypotrochoid, wave, harmonograph, polygon and scope — share the
+rose, hypotrochoid, wave, harmonograph, polygon, scope, superformula,
+maurer and knot — share the
 ratio A / ratio B / morph controls, which each shape interprets in its
 own way.
 
@@ -97,6 +98,61 @@ circle), and *xy* (Lissajous plot of the waveform against a delayed copy
 of itself). Each falls back to a calm idle shape when no audio is
 present.
 
+**Superformula**: one equation that morphs continuously through circles,
+polygons, stars, flowers and blobs. Ratio A is the symmetry (how many
+lobes), ratio B and morph shape the lobes between fat and spiky. It
+rewards being modulated rather than set: put the oscillator or an audio
+band on morph and it walks the whole family.
+
+**Maurer**: walks a rose curve in fixed degree steps and joins the
+positions with straight chords, which interfere into a dense moiré
+lattice. Ratio A sets the petal count. Ratio B picks the lattice and, with
+it, the density — it runs from 20 chords at 1 up to 360 at 11 and 12.
+That matters on real hardware: at the default 800 points a 20-chord
+lattice gets 40 points per chord and draws crisply on anything, while the
+360-chord version gets barely two, which is less time than the galvos need
+to cross the field, so it comes out soft and dim. If you want the dense
+ones sharp, raise the point count (Settings, or the per-pattern override)
+and accept the lower frame rate.
+
+### Effects
+
+Three effects in the Effects panel (column 2). All are off at their
+defaults, and all apply to *every* shape and source, ILDA and text
+included.
+
+**Ripple**: pushes the curve in and out along its own edge. *ripples*
+sets how many waves travel around it, *ripple spd* how fast they move.
+Small amounts breathe; large amounts turn a circle into a flower.
+
+**Tilt / tumble / perspective**: rotates the figure in 3D. *tilt x* and
+*tilt y* aim it (0.5 is straight on), *tumble* rotates it continuously,
+*perspective* controls how strongly the far side shrinks. Flat shapes
+read as a card turning; the *knot* shape reads as a solid object.
+
+**Comet**: a bright head that travels along the path, leaving the rest
+dim — the beam keeps scanning the whole figure, so what you get is a
+chase rather than a shortened stroke. *comet* sets how much of the
+figure falls away behind the head, *comet spd* the travel speed
+(0.5 is stationary, below it runs backwards).
+
+Each of the Effects, Duplicator, Audio and Oscillator panels has a small
+**on/off switch** in the top right of its heading. Switching a panel off
+bypasses that whole stage while leaving its faders exactly where you left
+them, so you can drop the duplicator or the oscillator out of the picture
+and bring it back without rebuilding the setup. A bypassed panel dims its
+controls so it is obvious at a glance that they are not reaching the beam.
+The switch drives the same parameter the render loop reads, so MIDI and
+the preview keyboard stay in step with it. (Audio's switch is the AUDIO
+STOP control under a different name — one kill switch, two places to
+reach it.)
+
+**RESET ALL**, above the Oscillator panel, puts every parameter back to
+its default. It asks twice: the first press arms it, the second does it,
+and it disarms itself after a few seconds. Installed sources — text, an
+ILDA file, the custom polygon — are left alone; the reset is for settings,
+not for content you loaded.
+
 ### Modulation
 
 Three ways to move parameters without touching them: the oscillator
@@ -105,8 +161,8 @@ under *Position & geometry*).
 
 **Oscillator (LFO)** (top of column 3): a low-frequency oscillator that
 sweeps one parameter over time, for hands-free movement. Pick a
-**target** (morph, size, hue, ratio A/B, spin, position, dup spread or
-dotify) and a **wave** (sine, triangle, square, saw, or random
+**target** (morph, size, hue, ratio A/B, spin, position, dup spread,
+dotify, ripple, tilt y, comet or falloff) and a **wave** (sine, triangle, square, saw, or random
 sample-and-hold), then set **rate**, **depth** and **dropoff**. The LFO
 moves the target *around its current fader value* rather than
 overwriting it, so the fader still sets the centre and the oscillator
@@ -122,7 +178,11 @@ normalised, so it works without gain fiddling. Each frequency band —
 bass, mid, high — has a **destination dropdown** in the Audio panel
 selecting which parameter it drives. Defaults are bass→size, mid→morph,
 high→brightness, but you can point any band at size, morph, brightness,
-hue, spin, dup spread, dotify, X/Y position or ratio A, or *off*.
+hue, spin, dup spread, dotify, X/Y position, ratio A, ripple, comet,
+perspective or falloff, or *off*. Note the modulation only pushes a value
+*up* from where its fader sits, so a destination whose fader is already at
+maximum has nowhere to go — falloff in particular defaults to 1.0, so pull
+it down before routing a band at it.
 Multiple bands can target the same parameter (they add). Modulation is
 additive around the current fader value, so your faders still set the
 baseline, and routings are saved in patterns. **AUDIO STOP** (Audio

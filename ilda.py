@@ -146,8 +146,9 @@ class IldaLibrary:
 
     def names(self):
         try:
-            return sorted(f for f in os.listdir(self.folder)
-                          if f.lower().endswith(".ild"))
+            # case-insensitive, as in PatternBank.names
+            return sorted((f for f in os.listdir(self.folder)
+                           if f.lower().endswith(".ild")), key=str.lower)
         except OSError:
             return []
 

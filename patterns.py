@@ -36,7 +36,10 @@ class PatternBank:
             print(f"[bank] could not read {path}: {e} — starting empty")
 
     def names(self):
-        return sorted(self.patterns)
+        # case-insensitive: plain sorted() is ASCII order, which puts
+        # every capitalised name ahead of every lowercase one ("VU-1"
+        # before "dotted orbit") and does not read as alphabetical.
+        return sorted(self.patterns, key=str.lower)
 
     def save(self, name, params, ilda_file=None, extra=None):
         name = str(name).strip()[:32]

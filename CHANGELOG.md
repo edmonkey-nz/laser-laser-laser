@@ -3,6 +3,198 @@
 All notable changes to this project are documented here. This project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.7.0] — 2026-09-08
+
+Three new closed-curve shapes and three effects that apply to every shape.
+The effects are the larger half: a new stage in `frame()` reaches all
+fourteen shapes plus ILDA, text and the vectoriser, where a new generator
+only adds one more entry to the list.
+
+All of it stays inside the one geometry rule the engine is built on —
+single closed curves, no new blanked multi-stroke geometry.
+
+### Added
+- **`superformula`** — the Gielis superformula: one equation that morphs
+  continuously through circles, polygons, stars, flowers and blobs. Ratio A
+  is the symmetry, ratio B and morph the lobe shape. Built to be modulated:
+  the oscillator or an audio band on morph walks the whole family.
+- **`maurer`** — a Maurer rose. Walks a rose curve in fixed degree steps and
+  joins the positions with chords, which interfere into a dense moiré
+  lattice. Ratio B selects the lattice *and* its density, ordered from 20
+  chords up to the classic 360. Density is the part that matters on real
+  hardware: at 800 points a 360-chord rose gets 2.2 points per chord, about
+  88 us for the galvos to cross the field, which they cannot do — so the
+  dense end is deliberately at the top of the dial rather than spread across
+  it. Each step is also chosen large enough that the chords cross into a
+  lattice instead of hugging the rose outline, and the walk runs for exactly
+  360/gcd(d, 360) chords, which is one closure, so no part of the point
+  budget is spent retracing.
+- **`knot`** — a (p,q) torus knot, and the first genuinely 3D shape. It
+  returns a third `z` column, which the new tilt/tumble stage projects.
+  Generators may now return `(x, y)` or `(x, y, z)`; the six existing ones
+  are untouched and sit at z = 0.
+- **Ripple warp** — displaces the curve along its own normal, indexed by
+  point number rather than polar angle so it works on open curves,
+  off-centre curves and source frames alike. An integer cycle count is what
+  keeps a closed curve closed.
+- **3D tilt / tumble / perspective** — rotates any shape in 3D with a
+  perspective divide, before the duplicator so each copy reads as its own
+  object. The beam has no shading, so parallax is the only depth cue a
+  laser has.
+- **Comet chase** — a brightness envelope travelling along the path.
+  Intensity only: the geometry and the point rate are untouched, so the
+  galvos keep moving at full speed. The same trade as dotify.
+- `warp_amt`, `chase_amt`, `persp` are routable audio destinations;
+  `warp_amt`, `tilt_y` and `chase_amt` are oscillator targets. Both lists
+  are appended to, so existing patterns keep their routing.
+- The RANDOM button reaches the new shapes and effects.
+- **Per-panel on/off switches** on Effects, Duplicator, Audio and Oscillator,
+  in the top right of each heading. Switching a panel off bypasses that stage
+  in the render loop while leaving its faders untouched, so a panel can be
+  dropped and brought back without rebuilding the setup; a bypassed panel
+  dims its controls. The switches drive engine parameters (`fx_on`, `dup_on`,
+  `lfo_on`), so MIDI and the preview keyboard stay in step. Audio's switch
+  drives the existing `audio_off` rather than adding a second kill switch
+  that could disagree with the first.
+- **RESET ALL**, above the Oscillator panel — every parameter back to its
+  default, over a new `{"type":"params_reset"}` message. It snaps rather than
+  crossfading and cancels any transition in flight, since a reset that eased
+  in over two seconds would defeat the point of pressing it, and it resets
+  the running phases so spin and tumble return to their starting angles.
+  Installed sources (text, ILDA, the custom polygon) are left alone — they
+  are content, not settings. The button asks twice: the first press arms it,
+  the second does it, and it disarms itself after a few seconds.
+
+### Safety
+- **The 3D stage cannot collapse a figure to a point.** Rotating a flat
+  shape toward edge-on shrinks it without limit, and a flat shape that is
+  itself a line — lissajous at 1:1, polygon with 1 or 2 sides — goes all the
+  way to a single coordinate. Measured during development: an entire
+  800-point frame on one DAC coordinate, which is a parked beam and exactly
+  what `docs/SAFETY.md` §6 rules out. Two guards now prevent it: flat shapes
+  never reach perfect edge-on (`MIN_FLAT_COS`), and the stage may not shrink
+  any figure below a fraction of the extent it was handed
+  (`MIN_3D_EXTENT`). The edge-on guard folds through `|cos|` rather than
+  clamping the signed cosine: clamping held the width pinned at the floor
+  across a range of angles and then flipped the figure to its mirror, which
+  read as a stall followed by a jump of 584 DAC units in a single degree of
+  tumble. Folded, the largest step is 32 units against a median of 25, so
+  the rotation is smooth throughout. With both in place the worst dwell across every shape,
+  swept over the full tilt/perspective/ripple space, is 14 lit points
+  against the advisory threshold of 48 that `ilda.dwell_warnings` uses.
+- The perspective divide biases z so its denominator is never below 1, so
+  the projection can only shrink the figure, never drive coordinates off
+  the field. Clipped coordinates pile onto the field edge, which is the
+  same parked-beam hazard by another route.
+- New generators follow the existing defences: arc-length resampling for
+  even spacing (`polygon`'s idiom), normalising by max abs
+  (`hypotrochoid`'s), and a `gcd` guard on the knot (`polygon`'s). All four
+  were verified closed — the closing segment is exactly one sample step.
+
+### Changed
+- **Spin is off by default** (`spin` 0.5 rather than 0.55). A figure that
+  starts drifting the moment the app opens is a nuisance when you are trying
+  to set one up. This is the only change to how existing shapes render:
+  restoring the old value reproduces the previous output byte for byte, and
+  saved patterns are unaffected either way because they store `spin`
+  explicitly.
+- `ShapeEngine.default_params()` is now the single source of the factory
+  defaults, so `__init__` and the master reset cannot drift apart.
+- **`falloff` (the duplicator's per-copy size falloff) is now an oscillator
+  target and an audio destination.** Both lists are appended to, so every
+  saved pattern's existing routing still points where it did.
+  Wiring it up also needed the duplicator to read `p_mod["dup_scale"]`
+  rather than `p["dup_scale"]`: audio modulation is accumulated into
+  `p_mod` alone, so the raw read would have left falloff selectable in the
+  menu but inert in the beam. (The oscillator path would have worked either
+  way, which is exactly how a half-working routing goes unnoticed.)
+- **Lighter UI chrome.** The fader knob is a 4px marker rather than a 10px
+  slab (it was the loudest thing in a panel full of values), picking up the
+  accent colour on hover instead of wearing it permanently. The audio level
+  bars fill in `--ink-dim` rather than full `--ink`, so three bouncing bars
+  are no longer the brightest thing on the page.
+- **Panels tied to one shape dim when another shape is selected** — Wave
+  shape, Custom Shape, ILDA, Vectoriser, and the scope-mode buttons inside
+  Audio. Dimmed, deliberately *not* disabled: picking an ILDA file, drawing
+  a custom polygon or starting the vectoriser is what switches the engine to
+  that shape in the first place, so locking them until their shape is
+  current would make those shapes unreachable. It is a legibility cue, not
+  a gate.
+- RESET ALL moved from above the Oscillator panel to under Geometry.
+- **Four parameter columns instead of three, and a smaller beam preview.**
+  The preview is 359px rather than 479 (a quarter down), and the controls
+  grid is four columns from 1460px of viewport width up, dropping to three,
+  two and one below that. The panels were also redistributed: the old third
+  column carried six panels while the first carried three, so the page ran
+  well past the fold. They are now grouped as figure / placement /
+  colour-and-modulation / shape-specific-and-sources, which measures as a
+  tallest column of 771px against 868 before. Measured in a headless
+  browser at 1920, 1680, 1500 and 1460: four columns, preview holding
+  359px, and no scrolling in either direction.
+  The stage column's floor is set to the preview width, so the beam view
+  keeps its size instead of being squeezed further as the fourth column
+  is fitted in.
+- **The pattern, mask and ILDA lists now sort case-insensitively.** They
+  were already sorted, but `sorted()` is ASCII order, which puts every
+  capitalised name ahead of every lowercase one — "VU-1" landed above
+  "dotted orbit" and the bank did not read as alphabetical. All three
+  `names()` methods now sort on `str.lower`.
+
+### Removed
+- The `flow` shape. It was not interesting enough to keep — a wobbling
+  circle whose motion read as noise rather than as structure. Removed from
+  the end of `SHAPE_NAMES`, so no other shape's index moves and no saved
+  pattern is disturbed.
+
+### Fixed
+- **A recalled pattern now reproduces the look it was saved with.** Every
+  one of the 58 parameters was already stored and restored exactly — that
+  part was never broken. What leaked was the engine's *animation* state,
+  which is not part of a pattern: the spin angle, the hue rotation, the
+  duplicator's orbit, the two sweep oscillators, the 3D tumble, the shape
+  phase behind the ripple and the comet, and the oscillator's phase. All
+  nine kept whatever value the session had reached, so a pattern saved with
+  spin stopped and a deliberate `rotate` offset came back **76 degrees out
+  of true** — the parameters matched, the picture did not. `rotate` was
+  simply where it showed most, because a stationary figure's orientation is
+  obvious.
+
+  `ShapeEngine.reset_phases()` rewinds all nine, and a snapping pattern load
+  (or a randomise) now calls it. A crossfade deliberately does not: gliding
+  from wherever things are is the whole point of it, and snapping the phases
+  mid-glide is exactly the jump it exists to avoid. `reset_params()` shares
+  the same method rather than repeating the list.
+- **Content pushed outside the projection field no longer parks the beam.**
+  Off-field geometry was clamped onto the field boundary by the `np.clip` at
+  pack time, and a clamped run of *lit* points is a stationary beam — the
+  same hazard as a dwell, reached by a different route. Worst measured case:
+  a full-size lissajous at 1:1 rotated 45°, where the diagonal becomes
+  2·sqrt(2) long and 402 of its 800 points pin to the edge, giving a run of
+  201 lit points on one DAC coordinate. Ordinary shapes nudged into a corner
+  with pos X / pos Y produced runs of 41–120 the same way, so this was
+  general, not specific to one shape.
+
+  Points outside the field are now blanked rather than smeared along the
+  edge. The galvos travel the same path; the beam is simply off for the part
+  that is outside — which is also the correct visual behaviour, since
+  content off the edge of the field should not be drawn. With this in place
+  the worst dwell anywhere, swept across every shape over ratios, morph,
+  rotation, position, tilt, perspective and ripple, is 17 lit points against
+  the advisory threshold of 48 in `ilda.dwell_warnings`.
+
+  This predates the new shapes and effects — it reproduces on the 1.6.0 code
+  — but the 3D stage made it easier to reach, so it is fixed here. No saved
+  pattern changes: all seven starter patterns and all eleven original shapes
+  still render byte-identically, because none of them render off-field.
+
+### Notes
+- The effects default to off and `tilt_x`/`tilt_y` default to 0.5 (neutral),
+  so the whole stage is a byte-for-byte no-op at its defaults and existing
+  patterns render exactly as before.
+- Patterns saved before 1.7.0 carry none of the new keys, so loading one
+  leaves the effects at their *current* values rather than resetting them —
+  the same behaviour `rotate` and `size_y` already had.
+
 ## [1.6.0] — 2026-08-17
 
 LaserCube network output, and a runtime output selector. The LaserCube path is

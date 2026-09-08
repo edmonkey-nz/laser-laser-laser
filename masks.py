@@ -32,7 +32,8 @@ class MaskBank:
             print(f"[masks] could not read {path}: {e} — starting empty")
 
     def names(self):
-        return sorted(self.masks)
+        # case-insensitive, as in PatternBank.names
+        return sorted(self.masks, key=str.lower)
 
     def save(self, name, polys, invert=False):
         name = str(name).strip()[:32]

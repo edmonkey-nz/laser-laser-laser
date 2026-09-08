@@ -53,6 +53,12 @@ Standalone executables are built in CI only (`pyinstaller.spec` +
 
 - **Every code change bumps `__version__` in `laserx3.py` and adds a
   `CHANGELOG.md` entry.** (CONTRIBUTING.md ground rule.)
+- **When `__version__` changes, update the version line in `about.md` too.**
+  It is the second line of the file (`v1.7.0`) and it is what the About
+  panel shows the user — `webui.py` serves the file verbatim and
+  `pyinstaller.spec` bundles it, so nothing derives it from `__version__`
+  and nothing catches the drift. It had been left at v1.3.0 through four
+  releases before anyone noticed.
 - Laser safety governs anything touching the DAC stream: preserve the
   "closed curves + blanked travel moves + blank on exit" properties. Test in
   `--preview` before `--laser`. **`docs/SAFETY.md` §6 is the rulebook for
