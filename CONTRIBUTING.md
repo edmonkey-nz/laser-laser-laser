@@ -23,10 +23,14 @@ hope it's useful to other laser/synth tinkerers.
   report over-temperature.
 - Keep the **no-build-step** philosophy: vanilla Python + a single
   self-contained `static/index.html` (no bundlers, no npm, no CDN).
-- Every code change should bump the version in `laserx3.py`
-  (`__version__`) and add a `CHANGELOG.md` entry. When the version
-  changes, update the `v…` line in `about.md` as well — the About panel
-  reads that file directly, so nothing derives it and nothing warns you.
+- Every code change should bump the version and add a `CHANGELOG.md`
+  entry. The version is written out in five places and nothing derives it
+  from anything else: `__version__` in `laserx3.py`, line 2 of `about.md`
+  (the About panel serves that file verbatim), the version **badge** and
+  the "Current release" line in `README.md`, and the new `CHANGELOG.md`
+  heading. Leave historical mentions ("fixed in 1.5.0") alone. This keeps
+  drifting — `about.md` was four releases stale and the README two — so
+  grep for the previous number before tagging.
 
 ## Development
 

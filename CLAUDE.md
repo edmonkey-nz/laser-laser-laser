@@ -51,14 +51,22 @@ Standalone executables are built in CI only (`pyinstaller.spec` +
 
 ## Repo conventions
 
-- **Every code change bumps `__version__` in `laserx3.py` and adds a
-  `CHANGELOG.md` entry.** (CONTRIBUTING.md ground rule.)
-- **When `__version__` changes, update the version line in `about.md` too.**
-  It is the second line of the file (`v1.7.0`) and it is what the About
-  panel shows the user — `webui.py` serves the file verbatim and
-  `pyinstaller.spec` bundles it, so nothing derives it from `__version__`
-  and nothing catches the drift. It had been left at v1.3.0 through four
-  releases before anyone noticed.
+- **Every code change bumps the version and adds a `CHANGELOG.md` entry.**
+  (CONTRIBUTING.md ground rule.) The version is written out in **five**
+  places and nothing derives it from anything else, so bump all of them:
+  1. `laserx3.py` — `__version__` (the source of truth; `--version` reads it)
+  2. `about.md` — line 2, `v1.8.0`; the About panel serves this file verbatim
+  3. `README.md` — the shields.io **version badge** near the top
+  4. `README.md` — "Current release: **1.8.0**" under *## Version*
+  5. `CHANGELOG.md` — the new `## [1.8.0] — YYYY-MM-DD` heading
+
+  Historical mentions ("built in 1.6.0", "fixed in 1.5.0", SAFETY.md's
+  "applies to version 1.6.0 onward") are statements about the past and must
+  **not** be bumped.
+
+  This list is written out because it keeps drifting: `about.md` sat at
+  v1.3.0 through four releases, and the two README references sat at 1.6.0
+  through two. Nothing warns you — grep for the old number before tagging.
 - Laser safety governs anything touching the DAC stream: preserve the
   "closed curves + blanked travel moves + blank on exit" properties. Test in
   `--preview` before `--laser`. **`docs/SAFETY.md` §6 is the rulebook for
