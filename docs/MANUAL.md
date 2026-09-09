@@ -70,31 +70,29 @@ something to memorise.
 
 ### The desktop window
 
-The window the app opens is a **control panel**, not the picture — you watch
-the beam in the browser, on a screen you can put where you like. It shows:
+The window the app opens is a **launcher**, not a control surface — you run
+the synth from the browser. It shows:
 
-- the **arm state**, as a bar across the top that is impossible to misread:
-  grey when disarmed, solid red when the laser is live, with the brightness
-  ceiling beside it
 - the **URL to open in a browser**, for localhost and for this machine's
-  hostname (the second one is what other devices on the network use)
-- buttons — **open browser**, **arm** / **disarm**, **blank**, **quit**
-- live status: output device, frame rate, points and scan rate, current
-  shape, and how many browser windows are connected
-- the keyboard shortcuts, listed
-- a live thumbnail of the beam, as proof the render loop is running
+  hostname (the second is what other devices on the network use)
+- **open browser** and **quit** buttons
+- three lines of status: the output device and whether the laser is armed,
+  the frame rate and point budget, and how many browser windows are
+  connected
 
-Arming from the panel takes **two clicks** — the first arms the button, the
-second arms the laser — for the same reason the keyboard wants `shift-.`
-rather than `.`: arming should never be a single careless action. Disarming
-is always one click.
-
-Press **`v`** for the full-window beam view, and `v` again to come back.
-Closing the window, or **QUIT**, blanks the laser and stops the app.
+Arming, blanking and every parameter stay in the browser. The arm state is
+shown here as read-only text and turns red when the laser is live, but it
+is not a control: two places to arm a laser is two places for them to
+disagree about whether it is armed.
 
 The window is drawn at twice its base size, backing off if the display is
-too small — a true 2x is 1440x1120, so a 1080p screen lands a little under
-it. `--gui-scale N` overrides that and is used exactly as given.
+too small; `--gui-scale N` overrides that and is used exactly as given.
+Press **`v`** for a full-window beam view — what this window used to be —
+and `v` again to come back. Closing it, or **QUIT**, blanks the laser and
+stops the app.
+
+The keyboard shortcuts listed above still work while this window has focus,
+including `.` to disarm without reaching for the browser.
 
 If the control surface could not start — almost always because another copy
 is already running and holding the port — the window says so in place of the

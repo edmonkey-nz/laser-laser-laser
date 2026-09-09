@@ -130,13 +130,23 @@ class WebUI:
         asyncio.set_event_loop(self._loop)
 
         async def index(request):
-            return web.FileResponse(os.path.join(HERE, "static", "index.html"))
+            # no-cache, not no-store: the browser may keep the file and
+            # revalidate (a cheap 304), but must never serve it without
+            # asking. Without this there is no Cache-Control at all, so
+            # browsers apply a heuristic freshness window from Last-Modified
+            # and will happily show a *previous version's* page after an
+            # upgrade — which is exactly how a new Settings section appears
+            # to be missing from a fresh build.
+            return web.FileResponse(
+                os.path.join(HERE, "static", "index.html"),
+                headers={"Cache-Control": "no-cache"})
 
         async def monitor(request):
             """Chrome-free beam view for a second screen — reads the same
             binary frame stream as the control surface."""
             return web.FileResponse(
-                os.path.join(HERE, "static", "monitor.html"))
+                os.path.join(HERE, "static", "monitor.html"),
+                headers={"Cache-Control": "no-cache"})
 
         async def about(request):
             path = os.path.join(HERE, "about.md")

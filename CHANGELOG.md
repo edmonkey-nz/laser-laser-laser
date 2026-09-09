@@ -3,6 +3,29 @@
 All notable changes to this project are documented here. This project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.8.2] — 2026-09-09
+
+### Fixed
+- **A new build's browser UI could come up as the previous version's.** The
+  page was served with an `ETag` and a `Last-Modified` but no
+  `Cache-Control`, so browsers applied a heuristic freshness window and
+  served the cached copy *without revalidating*. After upgrading, a whole
+  new Settings section — Monochrome projector, in 1.8.0 — could simply not
+  be there, on a build that contained it. Now sent as `Cache-Control:
+  no-cache`, which still allows a cheap 304 but forbids serving stale
+  without asking. Applies to `/` and `/monitor`.
+
+### Changed
+- **The desktop window is a launcher again, not a second control surface.**
+  It had accumulated an arm bar, arm/blank buttons and a keyboard legend
+  that were never asked for; arming from two places is two places for them
+  to disagree about whether the laser is live. What is left is the URL, an
+  open-browser button, quit, and three lines of status. Arm state is shown
+  as read-only text, since a laser app's own window saying nothing about
+  whether the beam is live seemed worse than saying it plainly.
+  Now 560x300 logical, so a true 2x is 1120x600 and fits a 1080p screen —
+  which the taller layout did not.
+
 ## [1.8.1] — 2026-09-09
 
 ### Changed

@@ -26,7 +26,7 @@ Default MIDI CC map (channel-agnostic):
   Notes from C1 (36) upward select shapes.
 """
 
-__version__ = "1.8.1"
+__version__ = "1.8.2"
 
 import argparse
 import sys
@@ -408,34 +408,32 @@ class AudioAnalyzer:
 
 
 class Preview:
-    """The desktop window: a control panel, not a beam view.
+    """The desktop window: a launcher, not a control surface.
 
     Double-clicked from a file manager, the old window showed the beam and
-    nothing else — no URL, no way to know the browser UI existed, no way to
-    quit but the task manager. That is the problem PACKAGING.md (in
-    promptwaver) is about, and its four requirements are the right ones: the
-    URL as something you can act on, a live status line proving the thing is
-    alive, an obvious quit, and — here — the keys, since this window has
-    always had them and never said so.
+    nothing else — no URL, no sign that the browser UI existed, no way to
+    quit but the task manager. That is what this fixes, and that is all it
+    does: the address to open, a button to open it, a button to stop, and
+    enough status to show it is alive.
 
-    Built in pygame rather than the tkinter that doc recommends, because its
-    two premises do not hold here. pygame is already bundled for this window,
-    where tkinter would add tcl/tk plus a `python3-tk` step in Linux CI that
-    silently degrades to console-only if forgotten. And the doc's central
-    rule — Tk must own the main thread — inverts this app: the render loop
-    owns the main thread on purpose, because the Helios paces it by blocking
-    in GetStatus and blank-on-exit hangs off that. Moving the DAC writer to a
-    worker thread to make room for a window is not a trade worth making.
+    Everything else — arming, blanking, parameters — stays in the browser.
+    A second place to arm a laser is a second place for the two to disagree
+    about whether it is armed.
 
-    The beam is still here, as a thumbnail (proof of life, which is what the
-    doc asks a status line for) and full-window on `v` — the old behaviour is
-    a keystroke away rather than deleted.
+    Built in pygame rather than the tkinter that promptwaver's PACKAGING.md
+    recommends, because its two premises do not hold here. pygame is already
+    bundled for this window, where tkinter would add tcl/tk plus a
+    `python3-tk` step in Linux CI that silently degrades to console-only if
+    forgotten. And the doc's central rule — Tk must own the main thread —
+    inverts this app: the render loop owns the main thread on purpose,
+    because the Helios paces it by blocking in GetStatus and blank-on-exit
+    hangs off that.
+
+    The beam is still a keystroke away on `v`, full-window, which is what
+    this window used to be.
     """
 
-    # Logical layout size. Everything in draw() is expressed in these units
-    # and multiplied by self.scale, so the panel gets genuinely bigger type
-    # rather than a blurry upscale of a small one.
-    BASE_W, BASE_H = 720, 560
+    BASE_W, BASE_H = 560, 300
     SCALE = 2.0
     BG = (10, 12, 17)
     PANEL = (17, 21, 29)
@@ -457,7 +455,6 @@ class Preview:
         self.version = version
         self.size = size        # beam size when showing the beam full-window
         self.beam_full = False  # `v` toggles
-        self._arm_pending = 0.0  # arming from the panel asks twice
         # Back off the scale if the display cannot take it — at 2x this
         # window is 1440x1120, which is taller than a 1080p screen.
         self.scale = self.SCALE if scale is None else float(scale)
@@ -555,112 +552,57 @@ class Preview:
             pg.display.flip()
             return
 
-        armed = bool(self.out and self.out.armed)
-        cap = self.out.max_brightness if self.out else 1.0
-
         self._text(s, "LASER! LASER LASER!", u(16), u(14), self.big, self.ACCENT)
         if self.version:
             self._text(s, f"v{self.version}", u(268), u(20), self.small, self.DIM)
 
-        # --- arm state: the one fact that must never be ambiguous ---
-        bar = pg.Rect(u(16), u(44), self.W - u(32), u(36))
-        pg.draw.rect(s, self.DANGER if armed else self.PANEL, bar,
-                     border_radius=u(4))
-        pg.draw.rect(s, self.EDGE, bar, 1, border_radius=u(4))
-        label = "ARMED — LASER LIVE" if armed else "DISARMED — no output"
-        self._text(s, label, u(28), u(54), self.mid,
-                   (10, 12, 17) if armed else self.DIM)
-        capt = f"ceiling {cap * 100:.0f}%"
-        t = self.small.render(capt, True,
-                              (10, 12, 17) if armed else self.DIM)
-        s.blit(t, (bar.right - t.get_width() - u(12), u(58)))
-
-        # --- the URL, which is the thing a new user is missing ---
+        # --- the URL, which is the whole reason this window exists ---
         if self.url:
             self._text(s, "CONTROL SURFACE — open this in a browser:",
-                       u(16), u(94), self.small, self.DIM)
-            self._text(s, self.url, u(16), u(112), self.mid, self.ACCENT)
+                       u(16), u(54), self.small, self.DIM)
+            self._text(s, self.url, u(16), u(72), self.mid, self.ACCENT)
             if self.lan_url and self.lan_url != self.url:
                 self._text(s, f"or {self.lan_url}  (same network)", u(16),
-                           u(134), self.small, self.DIM)
+                           u(94), self.small, self.DIM)
         elif self.bind_error:
-            self._text(s, "CONTROL SURFACE UNAVAILABLE", u(16), u(94),
+            self._text(s, "CONTROL SURFACE UNAVAILABLE", u(16), u(54),
                        self.small, self.DANGER)
-            self._text(s, self.bind_error[:64], u(16), u(112), self.font,
+            self._text(s, self.bind_error[:64], u(16), u(72), self.font,
                        self.DANGER)
         else:
-            self._text(s, "browser UI disabled (--no-web)", u(16), u(112),
+            self._text(s, "browser UI disabled (--no-web)", u(16), u(72),
                        self.mid, self.DIM)
 
-        # --- buttons ---
-        # packed from the left, so losing OPEN BROWSER (no server) does not
-        # leave a hole where it would have been
-        y, gap = u(164), u(10)
-        pending = self._arm_pending > 0
-        specs = []
-        if self.url:
-            specs.append(("OPEN BROWSER", "open", False, False))
-        if armed:
-            specs.append(("DISARM", "arm", True, False))
-        else:
-            specs.append(("CLICK AGAIN TO ARM" if pending else "ARM LASER",
-                          "arm", False, pending))
-        specs.append(("UNBLANK" if self.engine.blanked else "BLANK",
-                      "blank", False, False))
-        specs.append(("QUIT", "quit", False, False))
+        # --- buttons: open the thing, or stop the thing ---
+        # Arming, blanking and the rest deliberately live in the browser.
+        # This window is a launcher, not a second control surface.
+        y, gap = u(124), u(10)
+        specs = ([("OPEN BROWSER", "open")] if self.url else []) + \
+                [("QUIT", "quit")]
         bw = (self.W - u(32) - (len(specs) - 1) * gap) // len(specs)
-        for i, (label, key, danger, active) in enumerate(specs):
-            self._button(s, label, (u(16) + i * (bw + gap), y, bw, u(32)), key,
-                         danger=danger, active=active)
+        for i, (label, key) in enumerate(specs):
+            self._button(s, label, (u(16) + i * (bw + gap), y, bw, u(32)), key)
 
-        # --- status, left; live beam, right ---
-        pg.draw.line(s, self.EDGE, (u(16), u(212)), (self.W - u(16), u(212)))
-        p = self.engine.p
+        # --- a little status, so it is visibly alive ---
+        pg.draw.line(s, self.EDGE, (u(16), u(176)), (self.W - u(16), u(176)))
         out_name = self.out.name if self.out else "none"
+        armed = bool(self.out and self.out.armed)
         clients = len(getattr(self.web, "_clients", ()) or ())
         rows = [
-            ("output", out_name),
+            ("output", f"{out_name}   —   "
+                       + ("LASER ARMED" if armed else "disarmed")),
             # getattr: pps is assigned by main() after construction, and a
             # status panel must never be able to take down the render loop
-            ("frame rate", f"{fps:.0f} fps   {self.engine.n_points} pts @ "
-                           f"{getattr(self.engine, 'pps', 0)} pps"),
-            ("shape", SHAPE_NAMES[int(p["shape"]) % len(SHAPE_NAMES)]),
+            ("running", f"{fps:.0f} fps   {self.engine.n_points} pts @ "
+                        f"{getattr(self.engine, 'pps', 0)} pps"),
             ("browsers", f"{clients} connected"),
         ]
-        yy = u(226)
+        yy = u(188)
         for k, v in rows:
             self._text(s, k, u(16), yy, self.small, self.DIM)
-            self._text(s, str(v), u(110), yy - u(1), self.font, self.INK)
+            self._text(s, str(v), u(110), yy - u(1), self.font,
+                       self.DANGER if (k == "output" and armed) else self.INK)
             yy += u(22)
-
-        self._beam(s, frame, (self.W - u(16) - u(160), u(220), u(160), u(160)))
-
-        # --- keys: this window always had them and never said so ---
-        pg.draw.line(s, self.EDGE, (u(16), u(392)), (self.W - u(16), u(392)))
-        self._text(s, "KEYS", u(16), u(400), self.small, self.DIM)
-        legend = [
-            ("1-9", "shape"),
-            ("< >", "ratio A"),
-            ("^ v", "ratio B"),
-            ("[ ]", "size"),
-            ("m / s", "morph / spin"),
-            ("h / a", "hue / audio"),
-            ("d", "copies"),
-            ("c", "mono"),
-            ("f / g", "flip X / Y"),
-            ("SPACE", "blank"),
-            (".", "disarm"),
-            ("shift-.", "arm"),
-            ("v", "beam view"),
-            ("ESC/q", "quit"),
-        ]
-        # four columns below the thumbnail: three beside it collided with it
-        cx, cy, ncol = u(16), u(420), 4
-        for i, (k, d) in enumerate(legend):
-            col = cx + (i % ncol) * ((self.W - u(32)) // ncol)
-            row = cy + (i // ncol) * u(20)
-            self._text(s, k.rjust(7), col, row, self.small, self.ACCENT)
-            self._text(s, d, col + u(62), row, self.small, self.DIM)
 
         self._text(s, "Closing this window stops the laser and blanks it.",
                    u(16), self.H - u(22), self.small, self.DIM)
@@ -670,38 +612,16 @@ class Preview:
 
     def _do(self, key):
         """A panel button. Returns False to quit."""
-        import time as _t
         if key == "quit":
             return False
         if key == "open" and self.url:
             import webbrowser
             webbrowser.open(self.url)
-        elif key == "blank":
-            self.engine.blanked = not self.engine.blanked
-        elif key == "arm" and self.out:
-            if self.out.armed:
-                self.out.set_armed(False)
-                self._arm_pending = 0.0
-                print("[laser] disarmed")
-            elif self._arm_pending > _t.monotonic():
-                # arm() can refuse (an over-temperature LaserCube), so report
-                # what actually happened rather than what was asked for
-                ok = self.out.set_armed(True)
-                self._arm_pending = 0.0
-                print("[laser] ARMED" if self.out.armed
-                      else f"[laser] arming refused ({ok})")
-            else:
-                # the keyboard needs shift for the same reason: arming should
-                # never be one careless click
-                self._arm_pending = _t.monotonic() + 3.0
         return True
 
     def handle_events(self):
         """Returns False when the app should quit."""
-        import time as _t
         pg, p = self.pygame, self.engine.p
-        if self._arm_pending and self._arm_pending < _t.monotonic():
-            self._arm_pending = 0.0
         for ev in pg.event.get():
             if ev.type == pg.QUIT:
                 return False
