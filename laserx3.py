@@ -26,7 +26,7 @@ Default MIDI CC map (channel-agnostic):
   Notes from C1 (36) upward select shapes.
 """
 
-__version__ = "1.8.0"
+__version__ = "1.8.1"
 
 import argparse
 import sys
@@ -432,7 +432,11 @@ class Preview:
     a keystroke away rather than deleted.
     """
 
-    W, H = 720, 560
+    # Logical layout size. Everything in draw() is expressed in these units
+    # and multiplied by self.scale, so the panel gets genuinely bigger type
+    # rather than a blurry upscale of a small one.
+    BASE_W, BASE_H = 720, 560
+    SCALE = 2.0
     BG = (10, 12, 17)
     PANEL = (17, 21, 29)
     EDGE = (28, 34, 48)
@@ -442,7 +446,8 @@ class Preview:
     DANGER = (255, 74, 61)
     OK = (60, 200, 120)
 
-    def __init__(self, engine, size=700, out=None, web=None, version=""):
+    def __init__(self, engine, size=700, out=None, web=None, version="",
+                 scale=None):
         import pygame
         self.pygame = pygame
         pygame.init()
@@ -453,12 +458,32 @@ class Preview:
         self.size = size        # beam size when showing the beam full-window
         self.beam_full = False  # `v` toggles
         self._arm_pending = 0.0  # arming from the panel asks twice
+        # Back off the scale if the display cannot take it — at 2x this
+        # window is 1440x1120, which is taller than a 1080p screen.
+        self.scale = self.SCALE if scale is None else float(scale)
+        if scale is None:
+            try:
+                info = pygame.display.Info()
+                if info.current_w > 0 and info.current_h > 0:
+                    fit = min((info.current_w - 40) / self.BASE_W,
+                              (info.current_h - 90) / self.BASE_H)
+                    self.scale = max(1.0, min(self.SCALE, fit))
+            except Exception:
+                pass
+        # An explicit --gui-scale is honoured as given: the fit calculation
+        # is a courtesy for the default, not a cap on what you asked for.
+        self.W = int(self.BASE_W * self.scale)
+        self.H = int(self.BASE_H * self.scale)
         self.screen = pygame.display.set_mode((self.W, self.H))
         pygame.display.set_caption("Laser! Laser Laser!")
-        self.font = pygame.font.SysFont("monospace", 13)
-        self.small = pygame.font.SysFont("monospace", 11)
-        self.big = pygame.font.SysFont("monospace", 20, bold=True)
-        self.mid = pygame.font.SysFont("monospace", 15, bold=True)
+        f = lambda pt: pygame.font.SysFont("monospace",
+                                           max(9, int(pt * self.scale)))
+        fb = lambda pt: pygame.font.SysFont("monospace",
+                                            max(9, int(pt * self.scale)), bold=True)
+        self.font = f(13)
+        self.small = f(11)
+        self.big = fb(20)
+        self.mid = fb(15)
         self.bind_error = getattr(web, "bind_error", None)
         port = getattr(web, "port", None)
         self.url = (f"http://localhost:{port}"
@@ -472,6 +497,10 @@ class Preview:
         self.buttons = []       # filled by draw(), hit-tested by handle_events
 
     # ---- helpers ----
+
+    def u(self, v):
+        """Logical layout unit -> device pixels."""
+        return int(v * self.scale)
 
     def _text(self, surf, txt, x, y, font=None, col=None):
         surf.blit((font or self.font).render(txt, True, col or self.INK), (x, y))
@@ -490,7 +519,7 @@ class Preview:
         pts = frame.astype(float)
         xs = x0 + pts[:, 0] / 0xFFF * w
         ys = y0 + (1.0 - pts[:, 1] / 0xFFF) * h
-        width = 2 if w > 400 else 1
+        width = max(1, self.u(2 if w > self.u(400) else 1))
         for i in range(len(pts) - 1):
             col = (int(pts[i, 2]), int(pts[i, 3]), int(pts[i, 4]))
             if col == (0, 0, 0):
@@ -503,8 +532,9 @@ class Preview:
         r = pg.Rect(rect)
         bg = self.DANGER if danger else (self.ACCENT if active else self.PANEL)
         fg = (10, 12, 17) if (danger or active) else self.INK
-        pg.draw.rect(surf, bg, r, border_radius=4)
-        pg.draw.rect(surf, self.EDGE, r, 1, border_radius=4)
+        pg.draw.rect(surf, bg, r, border_radius=self.u(4))
+        pg.draw.rect(surf, self.EDGE, r, max(1, self.u(1)),
+                     border_radius=self.u(4))
         t = self.small.render(label, True, fg)
         surf.blit(t, (r.centerx - t.get_width() // 2,
                       r.centery - t.get_height() // 2))
@@ -513,59 +543,59 @@ class Preview:
     # ---- drawing ----
 
     def draw(self, frame, fps=0.0):
-        pg = self.pygame
+        pg, u = self.pygame, self.u
         self.buttons = []
         s = self.screen
         s.fill(self.BG)
 
         if self.beam_full:
             self._beam(s, frame, (0, 0, self.W, self.H))
-            self._text(s, "v: back to the panel   ESC/q: quit", 10,
-                       self.H - 18, self.small, self.DIM)
+            self._text(s, "v: back to the panel   ESC/q: quit", u(10),
+                       self.H - u(18), self.small, self.DIM)
             pg.display.flip()
             return
 
         armed = bool(self.out and self.out.armed)
         cap = self.out.max_brightness if self.out else 1.0
 
-        self._text(s, "LASER! LASER LASER!", 16, 14, self.big, self.ACCENT)
+        self._text(s, "LASER! LASER LASER!", u(16), u(14), self.big, self.ACCENT)
         if self.version:
-            self._text(s, f"v{self.version}", 268, 20, self.small, self.DIM)
+            self._text(s, f"v{self.version}", u(268), u(20), self.small, self.DIM)
 
         # --- arm state: the one fact that must never be ambiguous ---
-        bar = pg.Rect(16, 44, self.W - 32, 36)
+        bar = pg.Rect(u(16), u(44), self.W - u(32), u(36))
         pg.draw.rect(s, self.DANGER if armed else self.PANEL, bar,
-                     border_radius=4)
-        pg.draw.rect(s, self.EDGE, bar, 1, border_radius=4)
+                     border_radius=u(4))
+        pg.draw.rect(s, self.EDGE, bar, 1, border_radius=u(4))
         label = "ARMED — LASER LIVE" if armed else "DISARMED — no output"
-        self._text(s, label, 28, 54, self.mid,
+        self._text(s, label, u(28), u(54), self.mid,
                    (10, 12, 17) if armed else self.DIM)
         capt = f"ceiling {cap * 100:.0f}%"
         t = self.small.render(capt, True,
                               (10, 12, 17) if armed else self.DIM)
-        s.blit(t, (bar.right - t.get_width() - 12, 58))
+        s.blit(t, (bar.right - t.get_width() - u(12), u(58)))
 
         # --- the URL, which is the thing a new user is missing ---
         if self.url:
-            self._text(s, "CONTROL SURFACE — open this in a browser:", 16, 94,
-                       self.small, self.DIM)
-            self._text(s, self.url, 16, 112, self.mid, self.ACCENT)
+            self._text(s, "CONTROL SURFACE — open this in a browser:",
+                       u(16), u(94), self.small, self.DIM)
+            self._text(s, self.url, u(16), u(112), self.mid, self.ACCENT)
             if self.lan_url and self.lan_url != self.url:
-                self._text(s, f"or {self.lan_url}  (same network)", 16, 134,
-                           self.small, self.DIM)
+                self._text(s, f"or {self.lan_url}  (same network)", u(16),
+                           u(134), self.small, self.DIM)
         elif self.bind_error:
-            self._text(s, "CONTROL SURFACE UNAVAILABLE", 16, 94,
+            self._text(s, "CONTROL SURFACE UNAVAILABLE", u(16), u(94),
                        self.small, self.DANGER)
-            self._text(s, self.bind_error[:64], 16, 112, self.font,
+            self._text(s, self.bind_error[:64], u(16), u(112), self.font,
                        self.DANGER)
         else:
-            self._text(s, "browser UI disabled (--no-web)", 16, 112,
+            self._text(s, "browser UI disabled (--no-web)", u(16), u(112),
                        self.mid, self.DIM)
 
         # --- buttons ---
         # packed from the left, so losing OPEN BROWSER (no server) does not
         # leave a hole where it would have been
-        y, gap = 164, 10
+        y, gap = u(164), u(10)
         pending = self._arm_pending > 0
         specs = []
         if self.url:
@@ -578,13 +608,13 @@ class Preview:
         specs.append(("UNBLANK" if self.engine.blanked else "BLANK",
                       "blank", False, False))
         specs.append(("QUIT", "quit", False, False))
-        bw = (self.W - 32 - (len(specs) - 1) * gap) // len(specs)
+        bw = (self.W - u(32) - (len(specs) - 1) * gap) // len(specs)
         for i, (label, key, danger, active) in enumerate(specs):
-            self._button(s, label, (16 + i * (bw + gap), y, bw, 32), key,
+            self._button(s, label, (u(16) + i * (bw + gap), y, bw, u(32)), key,
                          danger=danger, active=active)
 
         # --- status, left; live beam, right ---
-        pg.draw.line(s, self.EDGE, (16, 212), (self.W - 16, 212))
+        pg.draw.line(s, self.EDGE, (u(16), u(212)), (self.W - u(16), u(212)))
         p = self.engine.p
         out_name = self.out.name if self.out else "none"
         clients = len(getattr(self.web, "_clients", ()) or ())
@@ -597,17 +627,17 @@ class Preview:
             ("shape", SHAPE_NAMES[int(p["shape"]) % len(SHAPE_NAMES)]),
             ("browsers", f"{clients} connected"),
         ]
-        yy = 226
+        yy = u(226)
         for k, v in rows:
-            self._text(s, k, 16, yy, self.small, self.DIM)
-            self._text(s, str(v), 110, yy - 1, self.font, self.INK)
-            yy += 22
+            self._text(s, k, u(16), yy, self.small, self.DIM)
+            self._text(s, str(v), u(110), yy - u(1), self.font, self.INK)
+            yy += u(22)
 
-        self._beam(s, frame, (self.W - 16 - 160, 220, 160, 160))
+        self._beam(s, frame, (self.W - u(16) - u(160), u(220), u(160), u(160)))
 
         # --- keys: this window always had them and never said so ---
-        pg.draw.line(s, self.EDGE, (16, 392), (self.W - 16, 392))
-        self._text(s, "KEYS", 16, 400, self.small, self.DIM)
+        pg.draw.line(s, self.EDGE, (u(16), u(392)), (self.W - u(16), u(392)))
+        self._text(s, "KEYS", u(16), u(400), self.small, self.DIM)
         legend = [
             ("1-9", "shape"),
             ("< >", "ratio A"),
@@ -625,15 +655,15 @@ class Preview:
             ("ESC/q", "quit"),
         ]
         # four columns below the thumbnail: three beside it collided with it
-        cx, cy, ncol = 16, 420, 4
+        cx, cy, ncol = u(16), u(420), 4
         for i, (k, d) in enumerate(legend):
-            col = cx + (i % ncol) * ((self.W - 32) // ncol)
-            row = cy + (i // ncol) * 20
+            col = cx + (i % ncol) * ((self.W - u(32)) // ncol)
+            row = cy + (i // ncol) * u(20)
             self._text(s, k.rjust(7), col, row, self.small, self.ACCENT)
-            self._text(s, d, col + 62, row, self.small, self.DIM)
+            self._text(s, d, col + u(62), row, self.small, self.DIM)
 
         self._text(s, "Closing this window stops the laser and blanks it.",
-                   16, self.H - 22, self.small, self.DIM)
+                   u(16), self.H - u(22), self.small, self.DIM)
         pg.display.flip()
 
     # ---- input ----
@@ -818,6 +848,9 @@ def main():
     ap = argparse.ArgumentParser(description="Laser! Laser Laser! — Helios laser visuals synth")
     ap.add_argument("--version", action="version",
                     version=f"Laser! Laser Laser! {__version__}")
+    ap.add_argument("--gui-scale", type=float, default=None,
+                    help="size of the desktop window (default: 2x, backed "
+                         "off if the display is too small for it)")
     ap.add_argument("--laser", action="store_true", help="output to Helios DAC")
     ap.add_argument("--output", choices=("none", "helios", "lasercube"),
                     default=None,
@@ -979,7 +1012,8 @@ def main():
                       + (web.bind_error or f"listening on {web.port}"))
     crashlog.step("opening window" if args.preview
                   else "no window (--web only)")
-    preview = (Preview(engine, out=out, web=web, version=__version__)
+    preview = (Preview(engine, out=out, web=web, version=__version__,
+                       scale=args.gui_scale)
                if args.preview else None)
 
     print(f"[run] {engine.n_points} pts @ {engine.pps} pps ≈ "

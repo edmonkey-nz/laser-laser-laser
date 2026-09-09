@@ -3,6 +3,23 @@
 All notable changes to this project are documented here. This project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.8.1] — 2026-09-09
+
+### Changed
+- **The desktop window is drawn at 2x.** It was laid out at a size that was
+  legible on the machine it was written on and small everywhere else. The
+  layout is now expressed in logical units multiplied by a scale factor, so
+  the type is genuinely larger rather than an upscale of a small render.
+  The default backs off if the display cannot take it — a true 2x is
+  1440x1120, which is taller than a 1080p screen, so such a display lands
+  around 1.8x. `--gui-scale N` overrides that and is honoured as given.
+
+### Fixed
+- The README version badge and its "Current release" line had been left at
+  1.6.0 for two releases. The convention in CLAUDE.md and CONTRIBUTING.md
+  now names all five places the version is written out, and says which
+  historical mentions must *not* be bumped.
+
 ## [1.8.0] — 2026-09-09
 
 ### Added

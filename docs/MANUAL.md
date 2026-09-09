@@ -92,6 +92,10 @@ is always one click.
 Press **`v`** for the full-window beam view, and `v` again to come back.
 Closing the window, or **QUIT**, blanks the laser and stops the app.
 
+The window is drawn at twice its base size, backing off if the display is
+too small — a true 2x is 1440x1120, so a 1080p screen lands a little under
+it. `--gui-scale N` overrides that and is used exactly as given.
+
 If the control surface could not start — almost always because another copy
 is already running and holding the port — the window says so in place of the
 URL, rather than showing an address with nothing behind it. The synth itself
