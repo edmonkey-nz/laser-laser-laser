@@ -36,3 +36,7 @@ dist/
 helios_lib/
 *.spec
 !pyinstaller.spec
+
+# Field diagnostics (see crashlog.py) — per-run, never useful in the repo
+/error.txt
+/error.prev.txt

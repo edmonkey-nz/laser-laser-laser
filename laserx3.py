@@ -26,24 +26,35 @@ Default MIDI CC map (channel-agnostic):
   Notes from C1 (36) upward select shapes.
 """
 
-__version__ = "1.7.0"
+__version__ = "1.8.0"
 
 import argparse
 import sys
 import threading
 import time
 
+# Installed before anything else is imported, deliberately: a missing bundled
+# module or a broken native dependency is one of the things the log exists to
+# diagnose, and a handler installed after the failing import never runs.
+# (promptwaver's PACKAGING.md §4.)
+import crashlog
+crashlog.install(version=__version__)
+crashlog.step("interpreter up, importing dependencies")
+
 import numpy as np
 
 from ilda import IldaLibrary
 from geometry import GeometryCorrection, test_pattern
 from laser_output import NullOutput, SafeOutput, install_panic_handlers
+
 from mask import MaskFilter
 from masks import MaskBank
 from settings import SettingsStore
 from vectorise import VectorSource
 from patterns import PatternBank
 from shapes import ShapeEngine, SHAPE_NAMES
+
+crashlog.step("dependencies imported")
 
 # ---------------------------------------------------------------- MIDI map
 CC_MAP = {
@@ -397,51 +408,287 @@ class AudioAnalyzer:
 
 
 class Preview:
-    """pygame window mirroring the laser output, with keyboard control."""
+    """The desktop window: a control panel, not a beam view.
 
-    def __init__(self, engine, size=700, out=None):
+    Double-clicked from a file manager, the old window showed the beam and
+    nothing else — no URL, no way to know the browser UI existed, no way to
+    quit but the task manager. That is the problem PACKAGING.md (in
+    promptwaver) is about, and its four requirements are the right ones: the
+    URL as something you can act on, a live status line proving the thing is
+    alive, an obvious quit, and — here — the keys, since this window has
+    always had them and never said so.
+
+    Built in pygame rather than the tkinter that doc recommends, because its
+    two premises do not hold here. pygame is already bundled for this window,
+    where tkinter would add tcl/tk plus a `python3-tk` step in Linux CI that
+    silently degrades to console-only if forgotten. And the doc's central
+    rule — Tk must own the main thread — inverts this app: the render loop
+    owns the main thread on purpose, because the Helios paces it by blocking
+    in GetStatus and blank-on-exit hangs off that. Moving the DAC writer to a
+    worker thread to make room for a window is not a trade worth making.
+
+    The beam is still here, as a thumbnail (proof of life, which is what the
+    doc asks a status line for) and full-window on `v` — the old behaviour is
+    a keystroke away rather than deleted.
+    """
+
+    W, H = 720, 560
+    BG = (10, 12, 17)
+    PANEL = (17, 21, 29)
+    EDGE = (28, 34, 48)
+    INK = (200, 210, 224)
+    DIM = (92, 103, 120)
+    ACCENT = (216, 230, 242)
+    DANGER = (255, 74, 61)
+    OK = (60, 200, 120)
+
+    def __init__(self, engine, size=700, out=None, web=None, version=""):
         import pygame
         self.pygame = pygame
         pygame.init()
-        self.size = size
-        self.screen = pygame.display.set_mode((size, size))
-        pygame.display.set_caption("Laser! Laser Laser!")
         self.engine = engine
         self.out = out          # SafeOutput, for the ARM/DISARM keys
+        self.web = web          # WebUI, for the URL and the client count
+        self.version = version
+        self.size = size        # beam size when showing the beam full-window
+        self.beam_full = False  # `v` toggles
+        self._arm_pending = 0.0  # arming from the panel asks twice
+        self.screen = pygame.display.set_mode((self.W, self.H))
+        pygame.display.set_caption("Laser! Laser Laser!")
         self.font = pygame.font.SysFont("monospace", 13)
+        self.small = pygame.font.SysFont("monospace", 11)
+        self.big = pygame.font.SysFont("monospace", 20, bold=True)
+        self.mid = pygame.font.SysFont("monospace", 15, bold=True)
+        self.bind_error = getattr(web, "bind_error", None)
+        port = getattr(web, "port", None)
+        self.url = (f"http://localhost:{port}"
+                    if port and not self.bind_error else None)
+        try:
+            import socket
+            self.lan_url = (f"http://{socket.gethostname()}:{port}"
+                            if port else None)
+        except Exception:
+            self.lan_url = None
+        self.buttons = []       # filled by draw(), hit-tested by handle_events
 
-    def draw(self, frame):
+    # ---- helpers ----
+
+    def _text(self, surf, txt, x, y, font=None, col=None):
+        surf.blit((font or self.font).render(txt, True, col or self.INK), (x, y))
+
+    def _beam(self, surf, frame, rect):
+        """Draw the frame into rect. The whole point of the thumbnail is that
+        a still picture would not prove anything, so it is the real frame."""
         pg = self.pygame
-        self.screen.fill((6, 6, 10))
+        x0, y0, w, h = rect
+        pg.draw.rect(surf, (0, 0, 0), rect)
+        pg.draw.rect(surf, self.EDGE, rect, 1)
+        if self.engine.blanked:
+            self._text(surf, "BLANKED", x0 + w // 2 - 28, y0 + h // 2 - 7,
+                       self.small, self.DANGER)
+            return
         pts = frame.astype(float)
-        xs = pts[:, 0] / 0xFFF * self.size
-        ys = (1.0 - pts[:, 1] / 0xFFF) * self.size
-        if not self.engine.blanked:
-            for i in range(len(pts) - 1):
-                col = (int(pts[i, 2]), int(pts[i, 3]), int(pts[i, 4]))
-                pg.draw.line(self.screen, col, (xs[i], ys[i]),
-                             (xs[i + 1], ys[i + 1]), 2)
+        xs = x0 + pts[:, 0] / 0xFFF * w
+        ys = y0 + (1.0 - pts[:, 1] / 0xFFF) * h
+        width = 2 if w > 400 else 1
+        for i in range(len(pts) - 1):
+            col = (int(pts[i, 2]), int(pts[i, 3]), int(pts[i, 4]))
+            if col == (0, 0, 0):
+                continue                      # blanked travel move
+            pg.draw.line(surf, col, (xs[i], ys[i]), (xs[i + 1], ys[i + 1]),
+                         width)
+
+    def _button(self, surf, label, rect, key, danger=False, active=False):
+        pg = self.pygame
+        r = pg.Rect(rect)
+        bg = self.DANGER if danger else (self.ACCENT if active else self.PANEL)
+        fg = (10, 12, 17) if (danger or active) else self.INK
+        pg.draw.rect(surf, bg, r, border_radius=4)
+        pg.draw.rect(surf, self.EDGE, r, 1, border_radius=4)
+        t = self.small.render(label, True, fg)
+        surf.blit(t, (r.centerx - t.get_width() // 2,
+                      r.centery - t.get_height() // 2))
+        self.buttons.append((r, key))
+
+    # ---- drawing ----
+
+    def draw(self, frame, fps=0.0):
+        pg = self.pygame
+        self.buttons = []
+        s = self.screen
+        s.fill(self.BG)
+
+        if self.beam_full:
+            self._beam(s, frame, (0, 0, self.W, self.H))
+            self._text(s, "v: back to the panel   ESC/q: quit", 10,
+                       self.H - 18, self.small, self.DIM)
+            pg.display.flip()
+            return
+
+        armed = bool(self.out and self.out.armed)
+        cap = self.out.max_brightness if self.out else 1.0
+
+        self._text(s, "LASER! LASER LASER!", 16, 14, self.big, self.ACCENT)
+        if self.version:
+            self._text(s, f"v{self.version}", 268, 20, self.small, self.DIM)
+
+        # --- arm state: the one fact that must never be ambiguous ---
+        bar = pg.Rect(16, 44, self.W - 32, 36)
+        pg.draw.rect(s, self.DANGER if armed else self.PANEL, bar,
+                     border_radius=4)
+        pg.draw.rect(s, self.EDGE, bar, 1, border_radius=4)
+        label = "ARMED — LASER LIVE" if armed else "DISARMED — no output"
+        self._text(s, label, 28, 54, self.mid,
+                   (10, 12, 17) if armed else self.DIM)
+        capt = f"ceiling {cap * 100:.0f}%"
+        t = self.small.render(capt, True,
+                              (10, 12, 17) if armed else self.DIM)
+        s.blit(t, (bar.right - t.get_width() - 12, 58))
+
+        # --- the URL, which is the thing a new user is missing ---
+        if self.url:
+            self._text(s, "CONTROL SURFACE — open this in a browser:", 16, 94,
+                       self.small, self.DIM)
+            self._text(s, self.url, 16, 112, self.mid, self.ACCENT)
+            if self.lan_url and self.lan_url != self.url:
+                self._text(s, f"or {self.lan_url}  (same network)", 16, 134,
+                           self.small, self.DIM)
+        elif self.bind_error:
+            self._text(s, "CONTROL SURFACE UNAVAILABLE", 16, 94,
+                       self.small, self.DANGER)
+            self._text(s, self.bind_error[:64], 16, 112, self.font,
+                       self.DANGER)
+        else:
+            self._text(s, "browser UI disabled (--no-web)", 16, 112,
+                       self.mid, self.DIM)
+
+        # --- buttons ---
+        # packed from the left, so losing OPEN BROWSER (no server) does not
+        # leave a hole where it would have been
+        y, gap = 164, 10
+        pending = self._arm_pending > 0
+        specs = []
+        if self.url:
+            specs.append(("OPEN BROWSER", "open", False, False))
+        if armed:
+            specs.append(("DISARM", "arm", True, False))
+        else:
+            specs.append(("CLICK AGAIN TO ARM" if pending else "ARM LASER",
+                          "arm", False, pending))
+        specs.append(("UNBLANK" if self.engine.blanked else "BLANK",
+                      "blank", False, False))
+        specs.append(("QUIT", "quit", False, False))
+        bw = (self.W - 32 - (len(specs) - 1) * gap) // len(specs)
+        for i, (label, key, danger, active) in enumerate(specs):
+            self._button(s, label, (16 + i * (bw + gap), y, bw, 32), key,
+                         danger=danger, active=active)
+
+        # --- status, left; live beam, right ---
+        pg.draw.line(s, self.EDGE, (16, 212), (self.W - 16, 212))
         p = self.engine.p
-        hud = (f"{SHAPE_NAMES[int(p['shape'])]}  a={p['ratio_a']:.1f} "
-               f"b={p['ratio_b']:.1f} morph={p['morph']:.2f} "
-               f"spin={p['spin']:.2f} size={p['size']:.2f} "
-               f"audio={p['audio_amt']:.2f}"
-               + ("  [BLANKED]" if self.engine.blanked else ""))
-        self.screen.blit(self.font.render(hud, True, (180, 180, 180)), (8, 8))
+        out_name = self.out.name if self.out else "none"
+        clients = len(getattr(self.web, "_clients", ()) or ())
+        rows = [
+            ("output", out_name),
+            # getattr: pps is assigned by main() after construction, and a
+            # status panel must never be able to take down the render loop
+            ("frame rate", f"{fps:.0f} fps   {self.engine.n_points} pts @ "
+                           f"{getattr(self.engine, 'pps', 0)} pps"),
+            ("shape", SHAPE_NAMES[int(p["shape"]) % len(SHAPE_NAMES)]),
+            ("browsers", f"{clients} connected"),
+        ]
+        yy = 226
+        for k, v in rows:
+            self._text(s, k, 16, yy, self.small, self.DIM)
+            self._text(s, str(v), 110, yy - 1, self.font, self.INK)
+            yy += 22
+
+        self._beam(s, frame, (self.W - 16 - 160, 220, 160, 160))
+
+        # --- keys: this window always had them and never said so ---
+        pg.draw.line(s, self.EDGE, (16, 392), (self.W - 16, 392))
+        self._text(s, "KEYS", 16, 400, self.small, self.DIM)
+        legend = [
+            ("1-9", "shape"),
+            ("< >", "ratio A"),
+            ("^ v", "ratio B"),
+            ("[ ]", "size"),
+            ("m / s", "morph / spin"),
+            ("h / a", "hue / audio"),
+            ("d", "copies"),
+            ("c", "mono"),
+            ("f / g", "flip X / Y"),
+            ("SPACE", "blank"),
+            (".", "disarm"),
+            ("shift-.", "arm"),
+            ("v", "beam view"),
+            ("ESC/q", "quit"),
+        ]
+        # four columns below the thumbnail: three beside it collided with it
+        cx, cy, ncol = 16, 420, 4
+        for i, (k, d) in enumerate(legend):
+            col = cx + (i % ncol) * ((self.W - 32) // ncol)
+            row = cy + (i // ncol) * 20
+            self._text(s, k.rjust(7), col, row, self.small, self.ACCENT)
+            self._text(s, d, col + 62, row, self.small, self.DIM)
+
+        self._text(s, "Closing this window stops the laser and blanks it.",
+                   16, self.H - 22, self.small, self.DIM)
         pg.display.flip()
+
+    # ---- input ----
+
+    def _do(self, key):
+        """A panel button. Returns False to quit."""
+        import time as _t
+        if key == "quit":
+            return False
+        if key == "open" and self.url:
+            import webbrowser
+            webbrowser.open(self.url)
+        elif key == "blank":
+            self.engine.blanked = not self.engine.blanked
+        elif key == "arm" and self.out:
+            if self.out.armed:
+                self.out.set_armed(False)
+                self._arm_pending = 0.0
+                print("[laser] disarmed")
+            elif self._arm_pending > _t.monotonic():
+                # arm() can refuse (an over-temperature LaserCube), so report
+                # what actually happened rather than what was asked for
+                ok = self.out.set_armed(True)
+                self._arm_pending = 0.0
+                print("[laser] ARMED" if self.out.armed
+                      else f"[laser] arming refused ({ok})")
+            else:
+                # the keyboard needs shift for the same reason: arming should
+                # never be one careless click
+                self._arm_pending = _t.monotonic() + 3.0
+        return True
 
     def handle_events(self):
         """Returns False when the app should quit."""
+        import time as _t
         pg, p = self.pygame, self.engine.p
+        if self._arm_pending and self._arm_pending < _t.monotonic():
+            self._arm_pending = 0.0
         for ev in pg.event.get():
             if ev.type == pg.QUIT:
                 return False
+            if ev.type == pg.MOUSEBUTTONDOWN and ev.button == 1:
+                for rect, key in self.buttons:
+                    if rect.collidepoint(ev.pos):
+                        if not self._do(key):
+                            return False
+                        break
             if ev.type == pg.KEYDOWN:
                 k, mod = ev.key, ev.mod
                 shift = mod & pg.KMOD_SHIFT
                 if k in (pg.K_ESCAPE, pg.K_q):
                     return False
-                if pg.K_1 <= k <= pg.K_9:
+                if k == pg.K_v:
+                    self.beam_full = not self.beam_full
+                elif pg.K_1 <= k <= pg.K_9:
                     p["shape"] = k - pg.K_1
                 elif k == pg.K_RIGHT:
                     p["ratio_a"] = min(12, p["ratio_a"] + 1)
@@ -485,6 +732,72 @@ class Preview:
 
     def close(self):
         self.pygame.quit()
+
+
+MONO_LASER_COLOURS = ("r", "g", "b")     # column offset 0/1/2 into rgb
+
+
+def mono_laser(frame, colour, ttl=True, thresh=0.5):
+    """Collapse colour onto the single diode a monochrome projector has.
+
+    Not the same thing as the MONO button, which picks one *hue* out of the
+    palette and is a creative choice. This describes the hardware: a
+    red-only (or green-, or blue-only) projector, where every other channel
+    is a wire to nothing.
+
+    The naive version — zero the two channels the device lacks — is wrong,
+    and wrong in a way that looks like a bug. Content is hue-ramped along
+    the path, so a red-only device would draw only the arcs that happen to
+    be red and drop out through the cyan half of every rainbow. Instead
+    take each point's *level* as the strongest channel it had and put it on
+    the diode that exists, so the figure is drawn whole, continuously,
+    whatever hue it was authored in.
+
+    max() rather than a luma weighting on purpose: luma would render blues
+    at 11% and the beam would visibly dim through those arcs, which is the
+    same drop-out problem in a subtler form.
+
+    `ttl` is the common case for these projectors: the diode is switched,
+    not dimmed — full power or dark, with nothing in between. Feeding it a
+    graded level is then a fiction, because every non-zero value comes out
+    at 100%. So in TTL mode the level is thresholded to a clean on/off,
+    and the threshold is taken *relative to the brightest point in the
+    frame* rather than as an absolute. Absolute would mean the brightness
+    fader silently blanked the whole figure once it fell under the line;
+    relative keeps the structure the content actually has — a comet still
+    reads as a comet — and matches the hardware, where brightness is not a
+    thing you have.
+
+    Applied to the *shared* frame, not the DAC copy — unlike hw_orient and
+    geom. Those stay DAC-only so the preview remains a true alignment
+    reference; the brightness ceiling stays DAC-only so it is conspicuous.
+    Neither argument applies here: on a one-colour projector a rainbow
+    preview is simply a lie about what the wall will show, so preview,
+    browser scope and monitor all agree with the beam. Same reasoning as
+    the mask.
+    """
+    try:
+        idx = MONO_LASER_COLOURS.index(colour)
+    except ValueError:
+        return frame
+    out = frame.copy()
+    rgb = out[:, 2:5]
+    level = rgb.max(axis=1)          # 0 stays 0, so blanking survives
+    if ttl:
+        peak = int(level.max())
+        if peak <= 0:
+            level = np.zeros_like(level)
+        else:
+            # `level > 0` is load-bearing: at thresh 0 the >= test alone
+            # would light every blanked point in the frame, bridges included
+            cut = max(1, int(round(float(thresh) * peak)))
+            level = np.where((level > 0) & (level >= cut), 255, 0)
+        # the intensity column is switched too, or a device that reads it
+        # would see a graded value the diode cannot produce
+        out[:, 5] = np.where(level > 0, 255, 0).astype(out.dtype)
+    rgb[:] = 0
+    rgb[:, idx] = level
+    return out
 
 
 def hw_orient(frame, flip_x, flip_y):
@@ -574,6 +887,7 @@ def main():
     import os as _os
     engine = ShapeEngine(n_points=args.points)
     _here = _os.path.dirname(_os.path.abspath(__file__))
+    crashlog.step(f"loading data from {_here}")
     bank = PatternBank(_os.path.join(_here, "patterns.json"))
     ilda_lib = IldaLibrary(_os.path.join(_here, "ilda"))
     vec = VectorSource(engine)
@@ -586,6 +900,10 @@ def main():
     engine.n_points = int(settings.get("points", args.points))
     engine.hw_flip_x = bool(settings.get("hw_flip_x", args.hw_flip_x))
     engine.hw_flip_y = bool(settings.get("hw_flip_y", args.hw_flip_y))
+    engine.mono_laser = bool(settings.get("mono_laser", False))
+    engine.mono_laser_colour = str(settings.get("mono_laser_colour", "r"))
+    engine.mono_laser_ttl = bool(settings.get("mono_laser_ttl", True))
+    engine.mono_laser_thresh = float(settings.get("mono_laser_thresh", 0.5))
     engine.xfade_time = float(settings.get("xfade_time", 2.0))
     geom.set_corners(settings.get("corners", [0.0] * 8))
     geom.set_pincushion(float(settings.get("pincushion", 0.0)))
@@ -596,6 +914,7 @@ def main():
     audio = None if args.no_audio else AudioAnalyzer()
 
     web = None
+    crashlog.step("settings and banks loaded")
     if args.web:
         from webui import WebUI
         web = WebUI(engine, port=args.web_port, bank=bank,
@@ -651,7 +970,17 @@ def main():
         web.out = out
         web.make_backend = make_backend
 
-    preview = Preview(engine, out=out) if args.preview else None
+    # Wait for the bind before building the window, so it can show what
+    # actually happened rather than an optimistic URL (PACKAGING.md §1).
+    if web is not None:
+        crashlog.step(f"starting web server on port {args.web_port}")
+        web.ready.wait(5.0)
+        crashlog.step("web server: "
+                      + (web.bind_error or f"listening on {web.port}"))
+    crashlog.step("opening window" if args.preview
+                  else "no window (--web only)")
+    preview = (Preview(engine, out=out, web=web, version=__version__)
+               if args.preview else None)
 
     print(f"[run] {engine.n_points} pts @ {engine.pps} pps ≈ "
           f"{engine.pps / engine.n_points:.0f} fps — Ctrl-C to quit")
@@ -664,8 +993,11 @@ def main():
     # DAC keeps replaying its last frame.
     install_panic_handlers(out)
 
+    crashlog.step(f"entering render loop — output={out.name}, "
+                  f"{engine.n_points} pts @ {engine.pps} pps")
     last = time.monotonic()
     fps_ema = 0.0
+    armed_was = None          # arm transitions are logged, see below
     try:
         while True:
             now = time.monotonic()
@@ -687,12 +1019,28 @@ def main():
             # masking happens before the preview/web/DAC split so all three
             # agree — unlike hw_orient/geom, which are DAC-only
             frame = mask.apply(frame)
+            # same reasoning as the mask: a one-colour projector should look
+            # like one on the monitor too, so this is shared, not DAC-only
+            if engine.mono_laser:
+                frame = mono_laser(frame, engine.mono_laser_colour,
+                                   engine.mono_laser_ttl,
+                                   engine.mono_laser_thresh)
             fps_ema = 0.9 * fps_ema + 0.1 * (1.0 / max(dt, 1e-6))
+
+            # Arm transitions go in the log. Polled rather than hooked so
+            # every route is covered — browser, MIDI, panel button, keyboard
+            # — and so laser_output.py, which is copied verbatim into the
+            # sibling projects, needs no knowledge of this module.
+            if out.armed != armed_was:
+                armed_was = out.armed
+                crashlog.step(f"output {'ARMED' if out.armed else 'disarmed'}"
+                              f" — ceiling {out.max_brightness:.0%},"
+                              f" device {out.name}")
 
             if preview:
                 if not preview.handle_events():
                     break
-                preview.draw(frame)
+                preview.draw(frame, fps_ema)
 
             if web:
                 web.publish(frame, a, fps_ema)
@@ -715,6 +1063,7 @@ def main():
     except KeyboardInterrupt:
         pass
     finally:
+        crashlog.step("shutting down — blanking output")
         vec.stop_camera()
         out.close()
         if dac:
@@ -725,6 +1074,13 @@ def main():
             midi.close()
         if preview:
             preview.close()
+        # `finally` also runs while an exception is on its way to the hook,
+        # so ask what is in flight rather than assuming this was a clean
+        # shutdown — a log claiming "clean exit" above a traceback is worse
+        # than no log
+        _exc = sys.exc_info()[0]
+        crashlog.finish("clean exit" if _exc is None
+                        else f"shutting down after {_exc.__name__}")
 
 
 if __name__ == "__main__":

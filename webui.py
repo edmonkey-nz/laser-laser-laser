@@ -17,6 +17,8 @@ Client → server (JSON):
   {"type":"shape","index":2}
   {"type":"blank","value":true}
   {"type":"params_reset"}                    (master reset: all params to defaults)
+  {"type":"setting","key":"mono_laser","value":1}       (monochrome projector)
+  {"type":"setting","key":"mono_laser_colour","value":0} (0=red 1=green 2=blue)
   {"type":"arm","value":true}                (laser output gate; never persisted)
   {"type":"max_brightness","value":0.05}     (hard output ceiling, 0..1)
   {"type":"output","value":"helios"}         (switch backend; always disarms)
@@ -92,6 +94,12 @@ class WebUI:
         self._lock = threading.Lock()
         self._loop = None
         self._clients = set()        # touched only from server thread
+        # The bind happens on the worker thread, so the main thread needs a
+        # way to find out whether it worked before it tells anyone the URL.
+        # PACKAGING.md: a window saying "running" over a server that failed
+        # to start is worse than no window.
+        self.ready = threading.Event()
+        self.bind_error = None
         t = threading.Thread(target=self._run, daemon=True)
         t.start()
 
@@ -226,6 +234,13 @@ class WebUI:
                             "pps": getattr(self.engine, "pps", 30000),
                             "hw_flip_x": getattr(self.engine, "hw_flip_x", True),
                             "hw_flip_y": getattr(self.engine, "hw_flip_y", False),
+                            "mono_laser": getattr(self.engine, "mono_laser", False),
+                            "mono_laser_colour": getattr(
+                                self.engine, "mono_laser_colour", "r"),
+                            "mono_laser_ttl": getattr(
+                                self.engine, "mono_laser_ttl", True),
+                            "mono_laser_thresh": getattr(
+                                self.engine, "mono_laser_thresh", 0.5),
                             "xfade_time": self.engine.xfade_time,
                         },
                         "ilda_files": self.ilda.names(),
@@ -304,9 +319,20 @@ class WebUI:
         app.on_startup.append(start_bg)
 
         runner = web.AppRunner(app, access_log=None)
-        self._loop.run_until_complete(runner.setup())
-        site = web.TCPSite(runner, self.host, self.port)
-        self._loop.run_until_complete(site.start())
+        try:
+            self._loop.run_until_complete(runner.setup())
+            site = web.TCPSite(runner, self.host, self.port)
+            self._loop.run_until_complete(site.start())
+        except OSError as e:
+            # Almost always another copy of this app already running. Say
+            # that, rather than leaving a daemon thread to die quietly while
+            # the window advertises a URL that answers nothing.
+            self.bind_error = (f"port {self.port} is busy — is another copy "
+                               f"already running? ({e.strerror or e})")
+            print(f"[web] {self.bind_error}")
+            self.ready.set()
+            return
+        self.ready.set()
         print(f"[web] control surface at http://laserx3:{self.port} "
               f"(or http://localhost:{self.port}; reachable on your LAN too)")
         self._loop.run_forever()
@@ -483,9 +509,23 @@ class WebUI:
             elif key == "xfade_time":
                 self.engine.xfade_time = float(max(0.1, min(10.0, val)))
                 self.settings.set("xfade_time", self.engine.xfade_time)
-            elif key in ("hw_flip_x", "hw_flip_y"):
+            elif key == "mono_laser_thresh":
+                v = float(max(0.0, min(1.0, val)))
+                self.engine.mono_laser_thresh = v
+                self.settings.set("mono_laser_thresh", v)
+            elif key in ("hw_flip_x", "hw_flip_y", "mono_laser",
+                         "mono_laser_ttl"):
                 setattr(self.engine, key, bool(val))
                 self.settings.set(key, bool(val))
+            elif key == "mono_laser_colour":
+                # the wire carries an index so the message stays numeric
+                # like every other setting; anything else falls back to red
+                from laserx3 import MONO_LASER_COLOURS
+                i = int(val)
+                col = (MONO_LASER_COLOURS[i]
+                       if 0 <= i < len(MONO_LASER_COLOURS) else "r")
+                self.engine.mono_laser_colour = col
+                self.settings.set("mono_laser_colour", col)
         elif t == "vec_source":
             mode = msg.get("mode", "off")
             self.vec.set_mode(mode, msg.get("device"))

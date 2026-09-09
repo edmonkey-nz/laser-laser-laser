@@ -532,6 +532,13 @@ class ShapeEngine:
         # per-pattern PPS/points overrides (None = use system settings)
         self.pattern_pps = None
         self.pattern_points = None
+        # monochrome-projector settings (hardware, restored from settings.json
+        # by laserx3; the engine only carries them so every surface can read
+        # the same state)
+        self.mono_laser = False
+        self.mono_laser_colour = "r"
+        self.mono_laser_ttl = True     # these projectors switch, not dim
+        self.mono_laser_thresh = 0.5   # on/off cut, relative to frame peak
         self.paused = False       # freezes all time-driven motion
         self.on_load = None       # optional callback when a pattern loads
         self.test_frame = None    # when set, overrides all shapes (alignment)

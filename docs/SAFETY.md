@@ -99,6 +99,27 @@ purely creative control operating underneath the ceiling.
 At 5% on an 8-bit colour channel you have about 13 levels. Plenty for aiming,
 coarse for content.
 
+#### It does nothing on a switched (TTL) projector
+
+The ceiling scales amplitude. A projector whose diode is **switched rather
+than dimmed** — full power or dark, which is most single-colour units — has
+no amplitude to scale. Every non-zero value it receives comes out at 100%, so
+a 5% ceiling produces a full-power beam while the header reads 5%.
+
+This is the one case where the bring-up procedure in §1 is actively
+misleading: step 5 has you trust a number that the hardware ignores. On such
+a projector the ceiling is not a limiter at all. Use the key switch, the
+shutter, eyewear and distance, and treat every armed frame as full power —
+because it is.
+
+**Settings → Monochrome projector → on/off only (TTL)** is where this is
+declared, and the panel says the same thing next to the checkbox. Ticking it
+does not make the projector safer; it makes the *image* correct, by cutting
+graded levels to a clean on/off instead of sending values the diode cannot
+render. The safety consequence is a property of the hardware and is there
+whether or not the box is ticked.
+
+
 ### Watchdog
 
 A daemon thread blanks the output if the render loop stops feeding it — a GC
@@ -176,7 +197,7 @@ Be specific about this, because vague reassurance is worse than none:
 | Control | Does not help against |
 |---|---|
 | ARM gate | Anything after you've armed it. It is a deliberate-action gate, not a monitor. |
-| Brightness ceiling | A crash, a driver bug, a stuck buffer, or a protocol error. It is a **creative limiter**. It also cannot stop a beam that is parked — 5% of a 7.5 W beam, stationary, still burns. |
+| Brightness ceiling | A crash, a driver bug, a stuck buffer, or a protocol error. It is a **creative limiter**. It also cannot stop a beam that is parked — 5% of a 7.5 W beam, stationary, still burns — and it does **nothing at all** on a switched (TTL) projector, which has no amplitude to scale. |
 | Watchdog | A driver wedged inside a C call, or anything that kills the process without running Python (`SIGKILL`, power loss, a kernel panic). |
 | Blank-on-exit | `kill -9`. Nothing in userspace survives that. |
 | [Mask](MANUAL.md#mask) | Anything. It is a **projection-mapping tool** — the galvos still travel through masked areas with the beam dark. Not an interlock, not a zone limiter. |

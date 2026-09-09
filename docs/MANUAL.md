@@ -61,11 +61,58 @@ header and Settings lights on any incoming message and the modal shows a
 running count, so "working but unmapped" and "no data at all" look
 different.
 
-**Keyboard** (preview window): `1–9` shapes, `←/→` ratio A, `↑/↓` ratio
+**Keyboard** (desktop window): `1–9` shapes, `←/→` ratio A, `↑/↓` ratio
 B, `[`/`]` size, `m` morph, `s` spin, `h` hue, `a` audio amount, `d`/`D`
-copies up/down, `c` mono, `f`/`g` flip X/Y, `SPACE` blank, `.` disarm
-the laser (`shift-.` arms it), `ESC`/`q` quit (blanks the laser on the
-way out).
+copies up/down, `c` mono, `f`/`g` flip X/Y, `SPACE` blank, `v` beam view,
+`.` disarm the laser (`shift-.` arms it), `ESC`/`q` quit (blanks the laser
+on the way out). The window lists them, so this is a reference rather than
+something to memorise.
+
+### The desktop window
+
+The window the app opens is a **control panel**, not the picture — you watch
+the beam in the browser, on a screen you can put where you like. It shows:
+
+- the **arm state**, as a bar across the top that is impossible to misread:
+  grey when disarmed, solid red when the laser is live, with the brightness
+  ceiling beside it
+- the **URL to open in a browser**, for localhost and for this machine's
+  hostname (the second one is what other devices on the network use)
+- buttons — **open browser**, **arm** / **disarm**, **blank**, **quit**
+- live status: output device, frame rate, points and scan rate, current
+  shape, and how many browser windows are connected
+- the keyboard shortcuts, listed
+- a live thumbnail of the beam, as proof the render loop is running
+
+Arming from the panel takes **two clicks** — the first arms the button, the
+second arms the laser — for the same reason the keyboard wants `shift-.`
+rather than `.`: arming should never be a single careless action. Disarming
+is always one click.
+
+Press **`v`** for the full-window beam view, and `v` again to come back.
+Closing the window, or **QUIT**, blanks the laser and stops the app.
+
+If the control surface could not start — almost always because another copy
+is already running and holding the port — the window says so in place of the
+URL, rather than showing an address with nothing behind it. The synth itself
+still runs.
+
+### error.txt
+
+Every run writes `error.txt` beside the executable (or next to the scripts
+from a checkout), and keeps the run before it as `error.prev.txt`. It holds
+a line per startup step, each arm and disarm with the ceiling and device in
+force at the time, and a full traceback if anything crashes.
+
+The breadcrumbs matter more than the traceback. The Helios is driven through
+ctypes, MIDI through rtmidi and the window through SDL — a fault inside any
+of those can take the process down with no Python traceback at all, and then
+the last line in the file is the only evidence of how far it got. It
+survives `kill -9` for the same reason: every line is written and closed on
+its own rather than buffered.
+
+If you are reporting a problem, send this file.
+
 
 ### Shapes
 
@@ -246,6 +293,41 @@ axis. Manual position and sweep add together.
 and sweep included — for projector orientation, rear projection, or
 bounce mirrors. These are artistic flips that affect preview and laser
 together (distinct from the hardware orientation flip below).
+
+**Monochrome projector** (Settings): for a projector with only one laser
+diode. Tick **mono laser** and pick red, green or blue — picking a colour
+ticks the box for you. Every point is then redrawn at the strength of its
+brightest channel, on the colour you chose, so the figure is drawn *whole
+and continuously* rather than dropping out through the parts of a hue sweep
+your device cannot produce. Simply muting the missing channels would leave
+a red-only projector drawing about two thirds of a rainbow-coloured figure;
+this draws all of it, at even brightness.
+
+This is not the same as the **MONO** button in the Colour panel. MONO picks
+one hue out of the palette and is a creative choice you might change
+between patterns; this describes your hardware and stays put. They compose
+— MONO green on a blue-only projector comes out blue. The hue swatches and
+hue cycle keep working, they just stop making a visible difference.
+
+**on/off only (TTL)** covers the usual case: these projectors switch the
+diode rather than dim it, full power or dark with nothing between. Leave it
+ticked and the level is cut to a clean on/off rather than a graded value the
+hardware cannot render, with **on threshold** setting where the cut falls.
+The threshold is relative to the brightest point in each frame, so turning
+the brightness fader down does not silently blank the whole figure, and a
+comet still reads as a comet — it just becomes a hard-edged arc instead of a
+fade. Untick it only for a mono projector with real analog modulation.
+
+> **The brightness ceiling does not work on a switched projector.** It caps
+> output by scaling amplitude, and a diode that is switched has none — at a
+> 5% ceiling it still fires at full power while the header reads 5%. The
+> bring-up procedure in `docs/SAFETY.md` §1 assumes an analog device; on this
+> hardware use the key switch, shutter, eyewear and distance instead, and
+> treat every armed frame as full power.
+
+Unlike the projection geometry correction, this *does* change the preview
+and the monitor window as well as the beam: on a one-colour projector a
+rainbow on screen would misrepresent what lands on the wall.
 
 **Projection geometry** (Settings → Projection geometry): corrects
 keystone and lens distortion on the **laser output only** — the preview

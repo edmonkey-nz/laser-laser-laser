@@ -3,6 +3,128 @@
 All notable changes to this project are documented here. This project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.8.0] — 2026-09-09
+
+### Added
+- **Monochrome projector setting** (Settings → Monochrome projector): a
+  checkbox plus a red/green/blue choice, for a projector with only one laser
+  diode. Persisted in `settings.json` as `mono_laser` / `mono_laser_colour`.
+
+  The obvious implementation is wrong. Zeroing the two channels the device
+  lacks leaves it drawing only the arcs that happen to be that colour —
+  measured on a default hue-ramped figure, a red-only device would emit
+  **533 of 800 points**, dropping out through the cyan half of every
+  rainbow. Instead each point's *level* is taken as its strongest channel
+  and put entirely on the diode that exists, so the figure is drawn whole
+  and continuously: **800 of 800**, at an even 255 across the sweep.
+
+  `max()` rather than a luma weighting, deliberately — luma renders blue at
+  29/255, so the beam would visibly dim through those arcs, which is the
+  same drop-out in a subtler form.
+
+  Applied to the **shared** frame, not the DAC copy. `hw_orient` and `geom`
+  are DAC-only so the preview stays a true alignment reference, and the
+  brightness ceiling is DAC-only so it stays conspicuous; neither argument
+  holds here. On a one-colour projector a rainbow preview is simply a lie
+  about what the wall will show, so the preview, the browser scope and the
+  monitor page all agree with the beam — the same reasoning as the mask.
+
+- **`on/off only (TTL)`**, on by default, for the usual case where the diode
+  is switched rather than dimmed. The level is cut to a clean on/off instead
+  of a graded value the hardware cannot render, at a threshold taken
+  *relative to the brightest point in the frame*. Relative rather than
+  absolute on purpose: an absolute cut means the brightness fader silently
+  blanks the whole figure once it drops under the line (measured: at
+  brightness 0.2 an absolute threshold emits 0 of 800 points, relative emits
+  800), and brightness is not something this hardware has anyway. Effects
+  that vary along the path still read — the comet becomes a hard-edged arc
+  rather than a fade.
+
+- **`error.txt` — a diagnostic that survives the field.** A packaged build
+  that dies has no console to print to, and on this app the likeliest deaths
+  leave no Python traceback at all: the Helios is reached through ctypes,
+  MIDI through rtmidi, the window through SDL, and a segfault in any of them
+  unwinds nothing. So the log is a **breadcrumb trail** first and a traceback
+  second — verified by `kill -9`, which still leaves nine breadcrumbs on disk
+  ending at the real last state, because every line is opened, written,
+  flushed and closed on its own.
+
+  Written beside the executable when frozen (falling back to the home
+  directory if the install location is read-only), next to the scripts from a
+  checkout. One previous run is kept as `error.prev.txt`, so a crash followed
+  by a restart does not overwrite the only evidence of the crash. The header
+  records python version, platform, frozen state, `_MEIPASS`, cwd and argv.
+
+  Installed **above the project's own imports**, since a missing bundled
+  module or a broken native dependency is one of the things it exists to
+  diagnose and a handler installed later never runs. `crashlog.py` is
+  standard-library only for the same reason. `threading.excepthook` is
+  covered too — this app runs the web server, the LaserCube sender and audio
+  capture on daemon threads, which otherwise die in silence.
+
+  **Arm and disarm transitions are logged**, with the ceiling and the device.
+  Polled in the render loop rather than hooked, so every route is caught —
+  browser, MIDI, panel button, keyboard — and so `laser_output.py`, which is
+  copied verbatim into the sibling projects, needs no knowledge of this
+  module. For a projector that will eventually run outdoors at power, being
+  able to answer "was it armed, at what ceiling, when this happened" after
+  the fact is worth the two lines it costs.
+- **`overridden` indicator on the Colour panel** when the monochrome
+  projector setting is on, since the hue controls keep working while quietly
+  no longer reaching the beam. The tooltip says why.
+- **The desktop window is a control panel, not a beam view.** Double-clicked
+  from a file manager the old window showed the beam and nothing else — no
+  URL, no sign that the browser UI existed, no way to quit but the task
+  manager. It now shows the arm state as a full-width bar you cannot misread,
+  the control-surface URL (localhost and hostname), buttons for **open
+  browser / arm / blank / quit**, live status (output backend, fps, points
+  and pps, shape, connected browsers), and the keyboard shortcuts — which
+  this window has always had and never mentioned. The beam is still there as
+  a live thumbnail, and `v` puts it back full-window.
+
+  Built in pygame rather than the tkinter that promptwaver's `PACKAGING.md`
+  recommends, because that document's two premises do not hold here. pygame
+  is already bundled for this window, where tkinter would add tcl/tk plus a
+  `python3-tk` step in Linux CI that degrades to console-only if forgotten.
+  More to the point, its central rule — Tk must own the main thread —
+  inverts this app: the render loop owns the main thread deliberately,
+  because the Helios paces it by blocking in `GetStatus` and blank-on-exit
+  hangs off that. Moving the DAC writer to a worker thread to make room for
+  a window is not a trade worth making. The document's *requirements* are
+  right and are all implemented; only its implementation is inapplicable.
+
+  Arming from the panel takes two clicks, for the same reason the keyboard
+  wants shift-`.` — arming should never be one careless action.
+
+### Fixed
+- **A busy port no longer produces a window advertising a URL that answers
+  nothing.** The web server binds on a worker thread, and a failure there
+  used to kill the thread quietly while the app carried on: the window would
+  show a URL, and nothing would be listening on it. The bind result is now
+  reported back (`WebUI.ready` / `WebUI.bind_error`), the main thread waits
+  for it before building the window, and the panel shows the failure and its
+  likely cause — another copy already running — instead of the URL. The app
+  still starts and still drives the laser; only the browser UI is missing,
+  which is what actually happened.
+
+### Safety
+- **Documented that the brightness ceiling does nothing on a switched (TTL)
+  projector.** The ceiling caps output by scaling amplitude; a switched diode
+  has no amplitude, so every non-zero value it receives comes out at 100% and
+  a 5% ceiling produces a full-power beam while the header reads 5%. This
+  makes the bring-up procedure in `docs/SAFETY.md` §1 actively misleading on
+  such a projector — it has you trust a number the hardware ignores. Called
+  out in SAFETY.md (its own subsection plus the limits table), in the manual,
+  and in the Settings panel next to the checkbox. Ticking TTL does not make
+  the projector safer; it makes the image correct. The hazard is a property
+  of the hardware and is there either way.
+
+  Distinct from the existing MONO button, which picks one *hue* out of the
+  palette and is a creative choice. This describes the hardware. The two
+  compose: with MONO green selected on a blue-only projector, the output is
+  blue. The hue controls and hue cycle keep running and simply stop making a
+  visible difference.
+
 ## [1.7.0] — 2026-09-08
 
 Three new closed-curve shapes and three effects that apply to every shape.

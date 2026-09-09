@@ -386,6 +386,24 @@
   .panel[data-shape].shape-inactive > h2 { color: #3d4657; }
   .scope-modes.shape-inactive { opacity: .38; }
 
+  .danger-note { border-left: 2px solid var(--danger); padding-left: .55rem;
+    color: var(--ink); }
+  .danger-note strong { color: var(--danger); }
+  /* ---- "these controls are being overridden" chip ---- */
+  .overridden {
+    font-size: .55rem; letter-spacing: .12em; text-transform: uppercase;
+    color: #f0b429; border: 1px solid #f0b42955; border-radius: 3px;
+    padding: .1rem .35rem; font-weight: 600; white-space: nowrap;
+  }
+
+  /* ---- monochrome projector picker ---- */
+  .mono-colours { display: flex; gap: .9rem; align-items: center; }
+  .mono-colours label { display: flex; align-items: center; gap: .3rem;
+    font-size: .78rem; color: var(--ink); cursor: pointer; }
+  .mono-colours .sw { width: 11px; height: 11px; border-radius: 2px;
+    display: inline-block; border: 1px solid #0006; }
+  .mono-colours input { accent-color: var(--accent); }
+
   /* ---- master reset ---- */
   .master-reset {
     width: 100%; background: var(--track); color: var(--ink);
@@ -613,7 +631,10 @@ Settings → Laser output">MAX <b id="cap-val">5%</b></span>
     </div>
     <div class="ccol">
       <div class="panel">
-        <h2>Colour</h2>
+        <h2 class="with-switch">Colour<span class="overridden"
+          id="colour-overridden" hidden
+          title="Mono laser is on in Settings — every colour here is collapsed onto the single diode the projector has. These controls still work, they just stop reaching the beam."
+          >overridden</span></h2>
         <div class="hue-swatches" id="hue-swatches"></div>
         <div id="col"></div>
         <div class="toggles">
@@ -755,6 +776,50 @@ Settings → Laser output">MAX <b id="cap-val">5%</b></span>
     <div class="toggles">
       <button id="cap-safe">SET 5% (BRING-UP)</button>
     </div>
+
+    <h3>Monochrome projector</h3>
+    <div class="map-hint">For a projector with only one laser diode. Every
+      point is redrawn at the strength of its brightest channel, on the
+      colour you pick — so the figure is drawn <strong>whole and
+      continuously</strong>, instead of dropping out through the parts of a
+      hue sweep your device cannot produce. The hue controls and hue cycle
+      keep running, they just stop making a visible difference.
+      This one <em>does</em> change the preview and the monitor, unlike the
+      geometry correction: a rainbow on screen would be a lie about what a
+      one-colour projector puts on the wall.</div>
+    <div class="set-row"><label for="set-mono-laser">mono laser</label>
+      <input id="set-mono-laser" type="checkbox"></div>
+    <div class="set-row"><label>colour</label>
+      <div class="mono-colours">
+        <label><input type="radio" name="mono-col" value="0"><span
+          class="sw" style="background:#ff2d20"></span>red</label>
+        <label><input type="radio" name="mono-col" value="1"><span
+          class="sw" style="background:#2dff5a"></span>green</label>
+        <label><input type="radio" name="mono-col" value="2"><span
+          class="sw" style="background:#3d7bff"></span>blue</label>
+      </div></div>
+    <div class="set-row"><label for="set-mono-ttl">on/off only (TTL)</label>
+      <input id="set-mono-ttl" type="checkbox"></div>
+    <div class="map-hint">Most single-colour projectors switch the diode
+      rather than dim it — full power or dark, nothing between. Leave this
+      ticked for one, and the level is cut to a clean on/off instead of a
+      graded value the hardware cannot produce. The cut is taken relative to
+      the brightest point in each frame, so the brightness fader does not
+      silently blank the whole figure and a comet still reads as a comet.
+      Untick it only for a mono projector with real analog modulation.</div>
+    <div class="set-row"><label for="set-mono-thresh">on threshold</label>
+      <input id="set-mono-thresh" type="range" min="0" max="1" step="0.01"
+             value="0.5"></div>
+    <div class="set-row"><label>current</label>
+      <span id="set-mono-thresh-val">50%</span></div>
+    <div class="map-hint danger-note" id="mono-ttl-warning" hidden>
+      <strong>The brightness ceiling cannot limit this projector.</strong>
+      The ceiling works by scaling amplitude, and a switched diode has no
+      amplitude — at a 5% ceiling it still fires at full optical power, and
+      the bring-up procedure in <code>docs/SAFETY.md</code> reads 5% while
+      the beam is at 100%. Use the key switch, the shutter, eyewear and
+      distance for bring-up on this projector. Dropping the ceiling is not
+      a substitute.</div>
 
     <h3>MIDI input</h3>
     <div class="set-row"><label for="midi-port">port</label>
@@ -1946,6 +2011,58 @@ for (const [key, b] of Object.entries(hwBtns))
   b.addEventListener("click", () =>
     send({ type: "setting", key, value: !hwState[key] }));
 
+/* ---------------- monochrome projector ---------------- */
+const monoChk = document.getElementById("set-mono-laser");
+const monoRadios = [...document.querySelectorAll('input[name="mono-col"]')];
+const MONO_COLS = ["r", "g", "b"];
+monoChk.addEventListener("change", () =>
+  send({ type: "setting", key: "mono_laser", value: monoChk.checked ? 1 : 0 }));
+for (const r of monoRadios)
+  r.addEventListener("change", () => {
+    // ticking a colour is also how you say "yes, this projector is mono" —
+    // choosing red and then hunting for the checkbox is a pointless step
+    send({ type: "setting", key: "mono_laser_colour",
+           value: parseInt(r.value, 10) });
+    if (!monoChk.checked) {
+      monoChk.checked = true;
+      send({ type: "setting", key: "mono_laser", value: 1 });
+    }
+  });
+const monoTtl = document.getElementById("set-mono-ttl");
+const monoThresh = document.getElementById("set-mono-thresh");
+const monoThreshVal = document.getElementById("set-mono-thresh-val");
+const monoWarn = document.getElementById("mono-ttl-warning");
+monoTtl.addEventListener("change", () =>
+  send({ type: "setting", key: "mono_laser_ttl", value: monoTtl.checked ? 1 : 0 }));
+monoThresh.addEventListener("input", () => {
+  monoThreshVal.textContent = Math.round(monoThresh.value * 100) + "%";
+  send({ type: "setting", key: "mono_laser_thresh",
+         value: parseFloat(monoThresh.value) });
+});
+function updateMonoLaser(st) {
+  if (document.activeElement !== monoChk) monoChk.checked = !!st.mono_laser;
+  const i = MONO_COLS.indexOf(st.mono_laser_colour || "r");
+  for (const r of monoRadios)
+    if (document.activeElement !== r) r.checked = (parseInt(r.value, 10) === i);
+  if (document.activeElement !== monoTtl) monoTtl.checked = !!st.mono_laser_ttl;
+  if (document.activeElement !== monoThresh && st.mono_laser_thresh !== undefined) {
+    monoThresh.value = st.mono_laser_thresh;
+    monoThreshVal.textContent = Math.round(st.mono_laser_thresh * 100) + "%";
+  }
+  // everything under the checkbox means nothing with it unticked
+  const on = !!st.mono_laser;
+  for (const r of monoRadios) r.closest("label").style.opacity = on ? "1" : ".45";
+  monoTtl.closest(".set-row").style.opacity = on ? "1" : ".45";
+  monoThresh.closest(".set-row").style.opacity =
+    (on && st.mono_laser_ttl) ? "1" : ".45";
+  // the ceiling warning is only true when a switched diode is actually in use
+  monoWarn.hidden = !(on && st.mono_laser_ttl);
+  // and say so where the affected controls are, not only in Settings: the
+  // hue faders keep working, they just stop reaching the beam
+  const co = document.getElementById("colour-overridden");
+  if (co) co.hidden = !on;
+}
+
 const midiPortSel = document.getElementById("midi-port");
 let midiPortsFp = "";
 midiPortSel.addEventListener("change", () =>
@@ -2206,6 +2323,7 @@ function onState(s) {
     if (document.activeElement !== el && st[key] !== undefined)
       el.value = st[key];
   hwState = { hw_flip_x: !!st.hw_flip_x, hw_flip_y: !!st.hw_flip_y };
+  updateMonoLaser(st);
   for (const [key, b] of Object.entries(hwBtns))
     b.classList.toggle("active", hwState[key]);
   const gm = s.geom || {};
