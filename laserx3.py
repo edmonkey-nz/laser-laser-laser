@@ -26,7 +26,7 @@ Default MIDI CC map (channel-agnostic):
   Notes from C1 (36) upward select shapes.
 """
 
-__version__ = "1.8.2"
+__version__ = "1.10.0"
 
 import argparse
 import sys
@@ -105,6 +105,8 @@ CC_MAP = {
     45: ("size_y", 0.02, 1.0),
     46: ("size_link", 0.0, 1.0),
     47: ("rotate", 0.0, 1.0),
+    48: ("prim3d", 0.0, 7.0),
+    49: ("lfo_uni", 0.0, 1.0),
 }
 
 # value ranges for every MIDI-mappable parameter (used by custom mapping)

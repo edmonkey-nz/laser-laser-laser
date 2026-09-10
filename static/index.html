@@ -282,12 +282,12 @@
   .aud-routes select { font: inherit; font-size: .7rem; background: var(--track);
     color: var(--ink); border: 1px solid transparent; border-radius: 4px; padding: .25rem .3rem; }
   .aud-routes select:focus-visible { outline: 2px solid var(--accent); }
-  .scope-modes { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .5rem; }
-  .scope-modes button { flex: 1 1 30%; font: inherit; font-size: .66rem;
+  .mode-grid { display: flex; flex-wrap: wrap; gap: .3rem; }
+  .mode-grid button { flex: 1 1 30%; font: inherit; font-size: .66rem;
     letter-spacing: .03em; cursor: pointer; background: var(--track);
     color: var(--ink); border: none; border-radius: 4px; padding: .35rem .2rem; }
-  .scope-modes button.active { background: var(--accent); color: #0a0c11; font-weight: 600; }
-  .scope-modes .hint { flex: 1 1 100%; color: var(--ink-dim); font-size: .66rem; }
+  .mode-grid button.active { background: var(--accent); color: #0a0c11; font-weight: 600; }
+  .mode-grid button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .ilda-row { display: flex; gap: .4rem; margin-bottom: .3rem; }
   .osc-row { display: flex; gap: .4rem; margin-bottom: .4rem; }
   .osc-row select { flex: 1; min-width: 0; font: inherit; font-size: .72rem;
@@ -448,7 +448,15 @@
   #blank:focus-visible,
   input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-  .fader { display: grid; grid-template-columns: 4.8rem 1fr 2.6rem; gap: .4rem; align-items: center; margin: .28rem 0; }
+  /* Four columns on every fader, not just the resettable ones: the reset
+     column is empty on the rest so the sliders still line up down a panel. */
+  .fader { display: grid; grid-template-columns: 4.6rem 1.05rem 1fr 2.5rem;
+    gap: .35rem; align-items: center; margin: .28rem 0; }
+  .fader-reset { font: inherit; font-size: .82rem; line-height: 1; padding: 0;
+    cursor: pointer; background: none; color: var(--ink-dim); border: none;
+    border-radius: 4px; }
+  .fader-reset:hover { color: var(--accent); background: var(--track); }
+  .fader-reset:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .fader label { font-size: .72rem; }
   .fader output { font-size: .68rem; }
   .fader label { font-size: .78rem; color: var(--ink); }
@@ -657,7 +665,6 @@ Settings → Laser output">MAX <b id="cap-val">5%</b></span>
         <div class="toggles">
           <button id="t-audio_off">AUDIO STOP</button>
         </div>
-        <div class="scope-modes" id="scope-modes"></div>
       </div>
       <div class="panel">
         <h2 class="with-switch">Oscillator<button class="pane-switch" data-pane="lfo_on">on</button></h2>
@@ -666,6 +673,13 @@ Settings → Laser output">MAX <b id="cap-val">5%</b></span>
           <select id="lfo-wave" title="oscillator waveform"></select>
         </div>
         <div id="lfo"></div>
+        <div class="toggles">
+          <button id="t-lfo_uni" title="Unipolar: the swing only ever adds to
+the fader value, never subtracts. Use it on anything whose zero is at the
+middle of its track — spin, tumble, orbit — where a bipolar sweep crosses
+that zero twice a cycle and reverses direction instead of just changing
+speed.">UNIPOLAR</button>
+        </div>
       </div>
     </div>
     <div class="ccol">
@@ -675,6 +689,18 @@ Settings → Laser output">MAX <b id="cap-val">5%</b></span>
           <select id="wave-type" title="waveform for the 'wave' shape"></select>
         </div>
         <div class="map-hint" style="margin:0">cycles = ratio A · amplitude/duty = morph</div>
+      </div>
+      <div class="panel" data-shape="scope">
+        <h2>Scope</h2>
+        <div class="mode-grid" id="scope-modes"></div>
+      </div>
+      <div class="panel" data-shape="3d">
+        <h2>3D Solid</h2>
+        <div class="mode-grid" id="prim3d-modes"></div>
+        <div class="map-hint" style="margin:.5rem 0 0">detail = ratio A ·
+          proportion = morph. Tilt, tumble and perspective in Effects turn it
+          — the solid is drawn in 3D and projected, so it has real
+          parallax.</div>
       </div>
       <div class="panel" data-shape="custom">
         <h2>Custom Shape</h2>
@@ -897,7 +923,7 @@ const FADERS = {
     ["ratio_a", "ratio A", 1, 12, 1],
     ["ratio_b", "ratio B", 1, 12, 1],
     ["morph",   "morph",   0, 1, 0.001],
-    ["spin",    "spin",    0, 1, 0.001],
+    ["spin",    "spin",    0, 1, 0.001, 0.5],   // 6th = reset target
     ["rotate",  "rotate",  0, 1, 0.001],
     ["size",    "size x",  0, 1, 0.001],
     ["size_y",  "size y",  0, 1, 0.001],
@@ -911,8 +937,8 @@ const FADERS = {
     ["audio_amt", "amount", 0, 1, 0.001],
   ],
   pos: [
-    ["pos_x",         "x pos",       0, 1, 0.001],
-    ["pos_y",         "y pos",       0, 1, 0.001],
+    ["pos_x",         "x pos",       0, 1, 0.001, 0.5],
+    ["pos_y",         "y pos",       0, 1, 0.001, 0.5],
     ["sweep_x",       "sweep x",     0, 1, 0.001],
     ["sweep_x_speed", "x speed",     0, 1, 0.001],
     ["sweep_y",       "sweep y",     0, 1, 0.001],
@@ -921,19 +947,19 @@ const FADERS = {
   fx: [
     ["warp_amt",    "ripple",      0, 1, 0.001],
     ["warp_freq",   "ripples",     1, 12, 1],
-    ["warp_speed",  "ripple spd",  0, 1, 0.001],
-    ["tilt_x",      "tilt x",      0, 1, 0.001],
-    ["tilt_y",      "tilt y",      0, 1, 0.001],
-    ["tumble",      "tumble",      0, 1, 0.001],
+    ["warp_speed",  "ripple spd",  0, 1, 0.001, 0.5],
+    ["tilt_x",      "tilt x",      0, 1, 0.001, 0.5],
+    ["tilt_y",      "tilt y",      0, 1, 0.001, 0.5],
+    ["tumble",      "tumble",      0, 1, 0.001, 0.5],
     ["persp",       "perspective", 0, 1, 0.001],
     ["chase_amt",   "comet",       0, 1, 0.001],
-    ["chase_speed", "comet spd",   0, 1, 0.001],
+    ["chase_speed", "comet spd",   0, 1, 0.001, 0.5],
   ],
   dup: [
     ["dup_count",  "copies",  1, 6, 1],
     ["dup_spread", "spread",  0, 1, 0.001],
     ["dup_scale",  "falloff", 0, 1, 0.001],
-    ["dup_spin",   "orbit",   0, 1, 0.001],
+    ["dup_spin",   "orbit",   0, 1, 0.001, 0.5],
   ],
   ildap: [
     ["ilda_rate", "playback", 0, 1, 0.001],
@@ -944,23 +970,37 @@ const FADERS = {
     ["lfo_dropoff", "dropoff", 0, 1, 0.001],
   ],
   vec: [
-    ["vec_bright",   "brightness", 0, 1, 0.001],
-    ["vec_contrast", "contrast",   0, 1, 0.001],
+    ["vec_bright",   "brightness", 0, 1, 0.001, 0.5],
+    ["vec_contrast", "contrast",   0, 1, 0.001, 0.5],
     ["vec_thresh",   "threshold",  0, 1, 0.001],
     ["vec_detail",   "detail",     0, 1, 0.001],
   ],
 };
 
+/* An optional 6th entry is the value the fader's reset button returns to.
+   It is on every parameter whose *zero* sits at 0.5 rather than at an end
+   of the track — spin, orbit, tumble, the tilts, the two speeds that run
+   backwards below halfway, the position pair, and the vectoriser's two
+   neutral-at-centre controls. Those are exactly the faders a drag cannot
+   reliably put back, because the value that matters is in the middle. Any
+   other fader becomes resettable by adding its rest value here. */
 const inputs = {};   // key -> {range, out, step}
 let dragging = null; // key currently being dragged (don't clobber from state)
 
 for (const [panelId, defs] of Object.entries(FADERS)) {
   const host = document.getElementById(panelId);
-  for (const [key, label, min, max, step] of defs) {
+  for (const [key, label, min, max, step, reset] of defs) {
+    const hasReset = reset !== undefined;
+    // fmt() is declared below this loop, so it cannot be called here
+    const resetTxt = hasReset
+      ? (step >= 1 ? String(Math.round(reset)) : reset.toFixed(2)) : "";
     const row = document.createElement("div");
     row.className = "fader";
-    row.innerHTML = `<label for="f-${key}">${label}</label>
-      <input id="f-${key}" type="range" min="${min}" max="${max}" step="${step}">
+    row.innerHTML = `<label for="f-${key}">${label}</label>` + (hasReset
+      ? `<button class="fader-reset" type="button"
+           title="${label} back to ${resetTxt}">\u21ba</button>`
+      : `<span class="fader-gap" aria-hidden="true"></span>`) +
+      `<input id="f-${key}" type="range" min="${min}" max="${max}" step="${step}">
       <output for="f-${key}">–</output>`;
     host.appendChild(row);
     const range = row.querySelector("input");
@@ -978,6 +1018,14 @@ for (const [panelId, defs] of Object.entries(FADERS)) {
         }
       }
     });
+    if (hasReset) {
+      // dispatching "input" rather than duplicating the send: the handler
+      // above already owns the wire message and the size-link follow-on
+      row.querySelector(".fader-reset").addEventListener("click", () => {
+        range.value = reset;
+        range.dispatchEvent(new Event("input"));
+      });
+    }
     range.addEventListener("pointerdown", () => dragging = key);
     range.addEventListener("pointerup",   () => dragging = null);
     inputs[key] = { range, out, step };
@@ -1004,7 +1052,9 @@ for (const t of document.querySelectorAll(".panel.collapsible .panel-toggle")) {
 }
 
 let shapeBtns = [];
+let shapeNames = [];
 function buildShapes(names) {
+  shapeNames = names;
   shapesEl.innerHTML = "";
   shapeBtns = names.map((n, i) => {
     const b = document.createElement("button");
@@ -1023,7 +1073,7 @@ function buildShapes(names) {
 }
 
 const TOGGLES = ["mono", "flip_x", "flip_y", "dup_mirror_x", "dup_mirror_y",
-                 "audio_off", "size_link"];
+                 "audio_off", "size_link", "lfo_uni"];
 let sizeLinked = true;   // mirrors s.p.size_link for the fader-drag logic
 const toggleBtns = {};
 let lastP = {};
@@ -1053,10 +1103,6 @@ const shapePanels = [...document.querySelectorAll(".panel[data-shape]")];
 function updateShapePanels(current) {
   for (const p of shapePanels)
     p.classList.toggle("shape-inactive", p.dataset.shape !== current);
-  // looked up here rather than cached: the module-level scopeModesEl is
-  // declared further down the file, and this must not depend on that order
-  const sm = document.getElementById("scope-modes");
-  if (sm) sm.classList.toggle("shape-inactive", current !== "scope");
 }
 
 /* ---------------- per-panel enable/bypass switches ---------------- */
@@ -1894,10 +1940,28 @@ const scopeBtns = SCOPE_MODES.map((name, i) => {
   scopeModesEl.appendChild(b);
   return b;
 });
-const scopeHint = document.createElement("span");
-scopeHint.className = "hint";
-scopeHint.textContent = "scope shape only";
-scopeModesEl.appendChild(scopeHint);
+
+/* ---------------- 3D solids ---------------- */
+/* Mirrors PRIM3D_NAMES in shapes.py, kept by hand like SCOPE_MODES and the
+   oscillator lists — these names are not sent over the wire. Clicking one
+   also selects the "3d" shape: the panel is dimmed rather than disabled
+   when another shape is up, and a click on a dimmed solid can only mean
+   "show me that one". */
+const PRIM3D_NAMES = ["sphere", "box", "torus", "pyramid", "cone",
+                      "cylinder", "octahedron", "tetrahedron"];
+const prim3dEl = document.getElementById("prim3d-modes");
+const prim3dBtns = PRIM3D_NAMES.map((name, i) => {
+  const b = document.createElement("button");
+  b.textContent = name;
+  b.title = "3D solid: " + name + " (the '3d' shape)";
+  b.addEventListener("click", () => {
+    send({ type: "set", key: "prim3d", value: i });
+    const idx = shapeNames.indexOf("3d");
+    if (idx >= 0) send({ type: "shape", index: idx });
+  });
+  prim3dEl.appendChild(b);
+  return b;
+});
 
 /* ---------------- ilda mode + pause + stop spin ---------------- */
 const ildaModeBtns = Array.from(
@@ -1981,7 +2045,8 @@ for (const defs of Object.values(FADERS))
   for (const d of defs) MAPPABLE.push([d[0], d[1]]);
 MAPPABLE.push(["lfo_rate","lfo rate"], ["lfo_depth","lfo depth"],
               ["lfo_dropoff","lfo dropoff"], ["lfo_target","lfo target"],
-              ["lfo_wave","lfo wave"], ["wave_type","wave type"],
+              ["lfo_wave","lfo wave"], ["lfo_uni","lfo unipolar"],
+              ["wave_type","wave type"],
               ["aud_bass_dest","audio bass dest"],
               ["aud_mid_dest","audio mid dest"],
               ["aud_high_dest","audio high dest"],
@@ -1989,6 +2054,7 @@ MAPPABLE.push(["lfo_rate","lfo rate"], ["lfo_depth","lfo depth"],
               ["mono", "mono"], ["flip_x", "flip X"], ["flip_y", "flip Y"],
               ["dup_mirror_x", "dup mirror X"], ["dup_mirror_y", "dup mirror Y"],
               ["ilda_mode", "ilda mode"], ["scope_mode", "scope mode"],
+              ["prim3d", "3d solid"],
               ["audio_off", "audio stop"],
               // action buttons (momentary, fire on knob/button press)
               ["act_pause", "\u25b6 pause (button)"],
@@ -2313,6 +2379,8 @@ function onState(s) {
   syncHueSwatches(s.p.hue || 0);
   const sm = Math.round(s.p.scope_mode || 0);
   scopeBtns.forEach((b, i) => b.classList.toggle("active", i === sm));
+  const pm = Math.round(s.p.prim3d || 0);
+  prim3dBtns.forEach((b, i) => b.classList.toggle("active", i === pm));
   pausedNow = !!s.paused;
   document.getElementById("t-pause").classList.toggle("active", pausedNow);
   const im = Math.round((s.p.ilda_mode || 0));

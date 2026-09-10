@@ -3,6 +3,65 @@
 All notable changes to this project are documented here. This project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.10.0] — 2026-09-11
+
+### Added
+
+- **Reset buttons on every centre-neutral fader.** Eleven parameters have
+  their zero in the *middle* of the track rather than at an end — spin,
+  orbit, tumble, tilt x/y, ripple spd, comet spd, x/y pos, and the
+  vectoriser's brightness and contrast. Each now carries a ↺ button
+  between its label and its slider that puts it back to 0.50 exactly,
+  which a drag cannot reliably do. The reset column is present on every
+  fader row (empty where unused) so the sliders still line up down a
+  panel.
+- **UNIPOLAR switch on the Oscillator.** The LFO's swing has always been
+  bipolar — equally above and below the fader value — which is wrong for
+  exactly the parameters above. On `spin` it crosses the stopped point
+  twice a cycle, so the figure ping-pongs instead of turning. Unipolar
+  folds the swing so it only ever adds: one continuous direction whose
+  speed moves. Works with all five waves, and depth means the same total
+  travel in both polarities, so flipping it changes where the movement
+  starts from, not how far it goes.
+
+## [1.9.0] — 2026-09-11
+
+### Added
+
+- **New shape: `3d`** — wireframe solids drawn as one closed space curve:
+  sphere, box, torus, pyramid, cone, cylinder, octahedron, tetrahedron.
+  Pick one in the new *3D Solid* panel; `ratio A` sets its detail (spiral
+  turns, coils, base sides, slant lines) and `morph` its proportion (tube
+  radius, height, stretch). Like `knot`, the generator returns a z column,
+  so tilt / tumble / perspective in Effects rotate a *solid* rather than a
+  picture of one, and the parallax is real.
+- **Reset button on the `spin` fader** — one click back to 0.50, the
+  stopped point. The mechanism is generic: an optional sixth entry in a
+  fader definition is the value its reset returns to, so any other fader
+  can have one for a one-line change.
+
+### Changed
+
+- **The scope mode buttons have their own panel.** They lived at the
+  bottom of the Audio panel, which read as if they were audio routing;
+  they are a property of the `scope` shape, so they now sit beside the
+  Wave / ILDA / Vectoriser panels and dim with the rest of them when
+  another shape is up.
+
+### Notes
+
+- Every solid is built at a fixed off-axis attitude rather than face-on.
+  This is a beam-safety choice, not a cosmetic one: face-on, a box
+  projects its four uprights onto four points, which would put a large
+  share of the point budget on four DAC coordinates. The tilt and tumble
+  faders rotate away from that attitude, so their centre position is the
+  safe one.
+- A wireframe has no Eulerian circuit in general (a cube's vertices are
+  all degree 3), so the connecting edges — a prism's uprights, a cone's
+  slant lines — are drawn twice to make one. The alternative is a blanked
+  travel move, and `docs/SAFETY.md` §6 does not allow trading the
+  closed-curve property away.
+
 ## [1.8.2] — 2026-09-09
 
 ### Fixed

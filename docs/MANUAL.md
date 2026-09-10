@@ -118,11 +118,11 @@ If you are reporting a problem, send this file.
 
 ### Shapes
 
-Ten generated shapes plus four external sources (ILDA, vectoriser,
+Eleven generated shapes plus four external sources (ILDA, vectoriser,
 text, and a hand-drawn custom polygon — covered under *Sources* below).
 The maths shapes — lissajous,
 rose, hypotrochoid, wave, harmonograph, polygon, scope, superformula,
-maurer and knot — share the
+maurer, knot and 3d — share the
 ratio A / ratio B / morph controls, which each shape interprets in its
 own way.
 
@@ -139,7 +139,7 @@ triangle, saw, square or pulse, chosen in the Wave shape panel (column
 3). Ratio A sets the number of cycles; morph controls amplitude (or duty
 cycle, for pulse).
 
-**Scope** (Audio panel, `scope` shape only): an audio visualiser with
+**Scope** (Scope panel, column 3, `scope` shape only): an audio visualiser with
 five modes, selectable by button — *waveform* (classic oscilloscope
 trace), *vu meter* (level bar that grows with loudness), *spectrum*
 (bass/mid/high skyline from the FFT), *radial* (waveform wrapped around a
@@ -164,6 +164,33 @@ to cross the field, so it comes out soft and dim. If you want the dense
 ones sharp, raise the point count (Settings, or the per-pattern override)
 and accept the lower frame rate.
 
+**3D** (3D Solid panel, column 3): eight wireframe solids — sphere, box,
+torus, pyramid, cone, cylinder, octahedron and tetrahedron — picked by
+button. Ratio A is the detail: spiral turns for the sphere, coil turns
+for the torus, base sides for the pyramid, slant lines for the cone,
+uprights for the cylinder. Morph is the proportion: tube radius, height,
+or stretch depending on the solid. Ratio B is unused.
+
+These are genuinely three-dimensional, not drawings of solids: the shape
+is built in space and projected, so *tilt*, *tumble* and *perspective* in
+the Effects panel turn a real object and the parallax is real. Tumble is
+what sells it — a laser beam has no shading, so motion is the only depth
+cue there is.
+
+Each solid is built already turned slightly away from the viewer. That is
+deliberate and worth leaving alone: seen exactly face-on, a box's four
+uprights point straight at you and collapse to four dots, which puts a
+lot of the frame's points on very little screen. The tilt faders turn the
+solid from that starting attitude, so their centre position is the good
+one.
+
+A wireframe cannot generally be drawn as one closed loop without
+retracing — a cube's corners each join three edges — so the connecting
+edges (a prism's uprights, a cone's slant lines) are drawn twice. That is
+the right trade: the alternative is a blanked jump, and closed curves
+with no blanked travel is the property the whole output path is built
+around.
+
 ### Effects
 
 Three effects in the Effects panel (column 2). All are off at their
@@ -174,10 +201,17 @@ included.
 sets how many waves travel around it, *ripple spd* how fast they move.
 Small amounts breathe; large amounts turn a circle into a flower.
 
+Faders whose neutral value is the *middle* of the track — spin, orbit,
+tumble, both tilts, ripple spd, comet spd, x/y pos and the vectoriser's
+brightness and contrast — carry a small ↺ button between the label and
+the slider. It puts the fader back to 0.50 exactly, which a drag cannot
+reliably do.
+
 **Tilt / tumble / perspective**: rotates the figure in 3D. *tilt x* and
 *tilt y* aim it (0.5 is straight on), *tumble* rotates it continuously,
 *perspective* controls how strongly the far side shrinks. Flat shapes
-read as a card turning; the *knot* shape reads as a solid object.
+read as a card turning; the *knot* and *3d* shapes read as solid
+objects.
 
 **Comet**: a bright head that travels along the path, leaving the rest
 dim — the beam keeps scanning the whole figure, so what you get is a
@@ -219,6 +253,21 @@ swings around it — depth 0 switches it off. Dropoff decays the swing
 across each cycle, so the movement settles toward the base value instead
 of oscillating evenly. It's a normal parameter, so it's mappable and
 saved in patterns — you can store a look that breathes on its own.
+
+**UNIPOLAR** (button, Oscillator panel) changes what "around" means. By
+default the swing is *bipolar*: it goes equally above and below the fader
+value. That is wrong for any target whose zero sits at the middle of its
+track. Put a bipolar sweep on **spin** and it crosses the stopped point
+twice a cycle, so the figure turns one way, stops, turns back — a
+ping-pong rather than a spin. Switch to unipolar and the swing only ever
+*adds*: spin rises above its fader value and settles back without ever
+reversing, so you get one continuous direction whose speed moves. The
+same applies to tumble, orbit, the tilts and the two speeds that run
+backwards below halfway. It works with all five waves — unipolar sine is
+a smooth swell, unipolar square gates between two speeds, unipolar saw
+ramps and restarts. Depth means the same total travel in both polarities,
+so switching does not change how far the parameter moves, only where it
+moves from.
 
 **Audio reactivity**: capture comes from the default input device (mic,
 or a loopback/monitor source — in `pavucontrol` set the recording source

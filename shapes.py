@@ -12,7 +12,7 @@ TWO_PI = 2.0 * np.pi
 
 SHAPE_NAMES = ["lissajous", "rose", "hypotrochoid", "wave", "harmonograph",
                "polygon", "scope", "ilda", "vector", "text", "custom",
-               "superformula", "maurer", "knot"]
+               "superformula", "maurer", "knot", "3d"]
 # NOTE: append only. The index is p["shape"], is persisted in patterns.json
 # and is bound to MIDI notes from NOTE_SHAPE_BASE — inserting mid-list
 # silently rewrites the shape of every saved pattern.
@@ -245,6 +245,239 @@ def knot(n, phase, p):
             tube * np.sin(qq * t) / m)
 
 
+# ------------------------------------------------------------- 3D solids
+
+PRIM3D_NAMES = ["sphere", "box", "torus", "pyramid", "cone",
+                "cylinder", "octahedron", "tetrahedron"]
+# NOTE: append only, same as SHAPE_NAMES — the index is p["prim3d"] and is
+# persisted in patterns.json.
+
+# Attitude every solid is built at, in radians (yaw about Y, then pitch
+# about X). Two jobs, and neither is decoration.
+#
+# The solids below are modelled with their axis along z — and z is the
+# *depth* axis once frame() projects, so as modelled a cone points straight
+# at the viewer and draws as a circle with spokes. The pitch is a quarter
+# turn (standing the axis up onto the screen's vertical) plus the tilt that
+# makes it a three-quarter view.
+#
+# That view is also the safe one. Face-on, a box projects its four uprights
+# onto four *points*: a large share of the point budget landing on four DAC
+# coordinates, which is the parked beam docs/SAFETY.md §6 exists to
+# prevent. Off-axis, every edge has screen length. The tilt/tumble stage
+# rotates away from here, so the centre of those faders is this attitude
+# rather than the degenerate one.
+PRIM3D_YAW = 0.48
+PRIM3D_TILT = 0.36
+# The quarter turn that stands an axis-along-z solid up. The torus is the
+# one primitive that does not want it: it is modelled ring-in-plane, which
+# is already the view that reads as a ring — stood up, it draws as a coil
+# seen from the side.
+PRIM3D_STAND = np.pi / 2
+
+
+def _resample_closed3(x, y, z, n):
+    """Equal-arc-length resample of a closed 3D polyline — the 3D twin of
+    _resample_closed, there for the same reasons: even spacing is even
+    brightness, and bunched samples are a slow beam. Measured in 3D, so a
+    long edge pointing away from the viewer keeps its share of the points
+    rather than starving once it foreshortens."""
+    px = np.concatenate([x, x[:1]])
+    py = np.concatenate([y, y[:1]])
+    pz = np.concatenate([z, z[:1]])
+    seg = np.sqrt(np.diff(px) ** 2 + np.diff(py) ** 2 + np.diff(pz) ** 2)
+    cum = np.concatenate([[0.0], np.cumsum(seg)])
+    if cum[-1] < 1e-9:
+        # degenerate, exactly as in _resample_closed: never return a point.
+        t = np.linspace(0, TWO_PI, n, endpoint=False)
+        return 0.15 * np.cos(t), 0.15 * np.sin(t), np.zeros(n)
+    s = np.linspace(0, cum[-1], n, endpoint=False)
+    return (np.interp(s, cum, px), np.interp(s, cum, py),
+            np.interp(s, cum, pz))
+
+
+def _euler_tour(edges):
+    """Hierholzer: a closed walk crossing every edge exactly once.
+
+    This is what lets a wireframe solid be a single closed curve with no
+    blanked travel moves. It needs every vertex to have even degree, which
+    a wireframe generally does not — a cube's vertices are all degree 3 —
+    so the builders below duplicate the *connecting* edges (a prism's
+    uprights, a cone's slant lines). That is why those are drawn twice and
+    the rims once. Retracing an edge costs points; a blanked jump costs the
+    closed-curve property, which is not for sale (docs/SAFETY.md §6).
+
+    A handful of those retraces come out back-to-back — out along an edge
+    and straight back down it, a 180 degree turn at the far vertex. That is
+    the same event as a corner on the `polygon` shape and is bounded the
+    same way: the arc-length resample downstream keeps the *sample* density
+    flat across it, so the beam decelerates through the vertex rather than
+    parking a run of points on it. Trying to order the tour around it is
+    not worth the code — the splicing, not the edge order, is what places
+    them, and removing them needs a repair pass on every frame.
+    """
+    adj = {}
+    for ei, (a, b) in enumerate(edges):
+        adj.setdefault(a, []).append((b, ei))
+        adj.setdefault(b, []).append((a, ei))
+    used = [False] * len(edges)
+    ptr = dict.fromkeys(adj, 0)
+    stack = [edges[0][0]]
+    tour = []
+    while stack:
+        v = stack[-1]
+        while ptr[v] < len(adj[v]) and used[adj[v][ptr[v]][1]]:
+            ptr[v] += 1
+        if ptr[v] == len(adj[v]):
+            tour.append(stack.pop())
+        else:
+            w, ei = adj[v][ptr[v]]
+            used[ei] = True
+            stack.append(w)
+    return tour[:-1]        # drop the repeated start; the curve closes
+
+
+def _ring(count, z, r=1.0):
+    """`count` vertices evenly around a circle at height z. The half-step
+    angular offset puts a flat edge at the top, so a 4-ring is an
+    axis-aligned square rather than a diamond."""
+    a = np.arange(count) * TWO_PI / count + np.pi / count
+    return np.stack([r * np.cos(a), r * np.sin(a), np.full(count, z)],
+                    axis=1)
+
+
+def _prism_edges(rim, struts):
+    """Two `rim`-gons joined by `struts` uprights. Vertices 0..rim-1 are
+    the bottom ring, rim..2*rim-1 the top. Uprights are doubled to make
+    every degree even — see _euler_tour."""
+    e = []
+    for j in range(rim):
+        e.append((j, (j + 1) % rim))
+        e.append((rim + j, rim + (j + 1) % rim))
+    for k in range(struts):
+        j = (k * rim) // struts
+        e.append((j, rim + j))
+        e.append((j, rim + j))
+    return e
+
+
+def _wheel_edges(rim, spokes):
+    """A `rim`-gon plus `spokes` lines to an apex (vertex index `rim`).
+    Spokes doubled for parity, same as _prism_edges."""
+    e = [(j, (j + 1) % rim) for j in range(rim)]
+    for k in range(spokes):
+        j = (k * rim) // spokes
+        e.append((j, rim))
+        e.append((j, rim))
+    return e
+
+
+# Rim resolution for the solids meant to read as round. High enough that
+# the facets vanish at projector resolution, low enough that the arc-length
+# resample still gives each upright a useful number of points.
+ROUND_RIM = 32
+
+
+def shape3d(n, phase, p):
+    """
+    Wireframe 3D primitives, each drawn as one closed space curve.
+
+    prim3d picks the solid (PRIM3D_NAMES). ratio_a is its detail — spiral
+    turns for the sphere, coils for the torus, base sides or slant lines
+    for the rest. morph is its proportion — tube radius, height, stretch.
+
+    Returns x, y AND z, like `knot`: the tilt/tumble/perspective stage in
+    frame() does the projection, so these tumble as solids rather than as a
+    spinning picture of one. That parallax is the only depth cue a beam
+    has, and it is what makes a wireframe cube read as a cube.
+
+    The tour-based solids retrace their connecting edges (see _euler_tour);
+    the parametric two do not retrace at all.
+    """
+    prim = int(round(p.get("prim3d", 0.0))) % len(PRIM3D_NAMES)
+    name = PRIM3D_NAMES[prim]
+    a = int(np.clip(round(p["ratio_a"]), 1, 12))
+    m = float(np.clip(p["morph"], 0.0, 1.0))
+
+    if name == "sphere":
+        # Closed spiral winding: theta spins `a` times while phi dips from
+        # one tropic to the other and back, so the curve closes on itself
+        # after one period. It deliberately stops short of the poles —
+        # a winding that reaches them reverses there, and a cusp is a
+        # stationary beam. morph opens it out toward them.
+        # Geared up for the same reason as the torus below: at a handful
+        # of turns the winding reads as a few stacked rings rather than a
+        # ball, and past ~30 there are too few points left to draw a turn.
+        cov = 0.35 + 0.62 * m
+        t = np.linspace(0, TWO_PI, max(n, 4 * ROUND_RIM), endpoint=False)
+        phi = np.pi / 2 + (np.pi / 2 * cov) * np.cos(t)
+        th = (2 * a + 4) * t
+        sphi = np.sin(phi)
+        x, y, z = sphi * np.cos(th), sphi * np.sin(th), np.cos(phi)
+    elif name == "torus":
+        # A toroidal coil: loops of tube wound around the ring. This is the
+        # p=1 case of `knot`, kept separate because the knot shape forces
+        # p>=2 and the plain wound ring is the recognisable solid.
+        #
+        # ratio_a is geared up rather than used directly. Below ~8 turns
+        # the winding does not read as a tube at all, just a wavy ring;
+        # above ~30 there are too few points per turn to draw one. The
+        # gearing puts the whole fader inside that window.
+        q = 2 * a + 6
+        tube = 0.12 + 0.38 * m
+        t = np.linspace(0, TWO_PI, max(n, 4 * ROUND_RIM), endpoint=False)
+        r = 1.0 + tube * np.cos(q * t)
+        x, y, z = r * np.cos(t), r * np.sin(t), tube * np.sin(q * t)
+    else:
+        sides = int(np.clip(a, 3, 12))
+        if name == "box":
+            h = 0.35 + 0.85 * m
+            verts = np.vstack([_ring(4, -h), _ring(4, h)])
+            edges = _prism_edges(4, 4)
+        elif name == "cylinder":
+            h = 0.3 + 0.9 * m
+            verts = np.vstack([_ring(ROUND_RIM, -h), _ring(ROUND_RIM, h)])
+            edges = _prism_edges(ROUND_RIM, sides)
+        elif name == "pyramid":
+            h = 0.5 + 1.1 * m
+            verts = np.vstack([_ring(sides, -h * 0.5),
+                               [[0.0, 0.0, h * 0.5]]])
+            edges = _wheel_edges(sides, sides)
+        elif name == "cone":
+            h = 0.5 + 1.1 * m
+            verts = np.vstack([_ring(ROUND_RIM, -h * 0.5),
+                               [[0.0, 0.0, h * 0.5]]])
+            edges = _wheel_edges(ROUND_RIM, sides)
+        elif name == "octahedron":
+            s = 0.4 + 1.3 * m
+            verts = np.array([[1, 0, 0], [0, 1, 0], [-1, 0, 0], [0, -1, 0],
+                              [0, 0, s], [0, 0, -s]], dtype=float)
+            # already 4-regular: the only solid here that needs no retrace
+            edges = [(0, 4), (4, 1), (1, 5), (5, 2), (2, 4), (4, 3),
+                     (3, 5), (5, 0), (0, 1), (1, 2), (2, 3), (3, 0)]
+        else:                                   # tetrahedron
+            s = 0.4 + 1.3 * m
+            verts = np.array([[1, 1, s], [1, -1, -s], [-1, 1, -s],
+                              [-1, -1, s]], dtype=float)
+            # K4 is 3-regular; doubling one pair of opposite edges (0-1
+            # and 2-3) is the cheapest way to make it Eulerian.
+            edges = [(0, 1), (1, 2), (2, 3), (3, 0),
+                     (0, 1), (1, 3), (3, 2), (2, 0)]
+        pts = verts[_euler_tour(edges)]
+        x, y, z = pts[:, 0], pts[:, 1], pts[:, 2]
+
+    # Bake in the default attitude — see PRIM3D_YAW for why this is not a
+    # cosmetic choice.
+    pitch = PRIM3D_TILT - (0.0 if name == "torus" else PRIM3D_STAND)
+    cy, sy = np.cos(PRIM3D_YAW), np.sin(PRIM3D_YAW)
+    x, z = x * cy + z * sy, -x * sy + z * cy
+    cp, sp = np.cos(pitch), np.sin(pitch)
+    y, z = y * cp - z * sp, y * sp + z * cp
+
+    mx = max(np.max(np.abs(x)), np.max(np.abs(y)), np.max(np.abs(z)), 1e-6)
+    return _resample_closed3(x / mx, y / mx, z / mx, n)
+
+
 SCOPE_MODES = ["waveform", "vu meter", "spectrum", "radial", "xy"]
 
 # parameters the oscillator (LFO) can modulate, and their display order.
@@ -460,9 +693,11 @@ class ShapeEngine:
             "aud_mid_dest": 2.0,   # mid -> morph
             "aud_high_dest": 3.0,  # high -> brightness
             "scope_mode": 0.0,  # scope visual: waveform/vu/spectrum/radial/xy
+            "prim3d": 0.0,      # which solid the "3d" shape draws
             "audio_off": 0.0,   # >0.5 = master audio kill (mods + scope idle)
             "lfo_target": 0.0,  # which param the oscillator modulates (index)
             "lfo_wave": 0.0,    # 0 sine 1 triangle 2 square 3 saw 4 random S&H
+            "lfo_uni": 0.0,     # >0.5 = unipolar: the swing only ever adds
             "lfo_rate": 0.3,    # oscillation speed
             "lfo_depth": 0.0,   # modulation amount (0 = off)
             "lfo_dropoff": 0.0,  # >0 = oscillation decays over each cycle
@@ -545,7 +780,8 @@ class ShapeEngine:
 
     DISCRETE = {"shape", "mono", "flip_x", "flip_y",
                 "dup_mirror_x", "dup_mirror_y", "ilda_mode",
-                "scope_mode", "audio_off", "lfo_target", "lfo_wave",
+                "scope_mode", "prim3d", "audio_off",
+                "lfo_target", "lfo_wave", "lfo_uni",
                 "wave_type", "aud_bass_dest", "aud_mid_dest", "aud_high_dest",
                 "size_link", "fx_on", "dup_on", "lfo_on"}
 
@@ -569,6 +805,7 @@ class ShapeEngine:
             "hue": round(_r.random(), 3),
             "hue_cycle": round(_r.choice([0, 0, 0.1, 0.25, 0.5]), 3),
             "wave_type": float(_r.randint(0, len(WAVE_TYPES) - 1)),
+            "prim3d": float(_r.randint(0, len(PRIM3D_NAMES) - 1)),
             # position roughly centred
             "pos_x": round(_r.uniform(0.4, 0.6), 3),
             "pos_y": round(_r.uniform(0.4, 0.6), 3),
@@ -603,6 +840,7 @@ class ShapeEngine:
             # oscillator: 50% chance active
             "lfo_target": float(_r.randint(0, len(LFO_TARGETS) - 1)),
             "lfo_wave": float(_r.randint(0, len(LFO_WAVES) - 1)),
+            "lfo_uni": float(_r.random() < 0.35),
             "lfo_rate": round(_r.uniform(0.1, 0.6), 3),
             "lfo_depth": round(_r.choice([0, 0, _r.uniform(0.2, 0.6)]), 3),
             "lfo_dropoff": round(_r.uniform(0, 0.5), 3),
@@ -735,7 +973,20 @@ class ShapeEngine:
                 self._lfo_sh = np.random.uniform(-1.0, 1.0)
             self._lfo_last_ph = ph
             s = getattr(self, "_lfo_sh", 0.0)
-        # dropoff: decay the swing across each cycle so it "settles"
+        # Polarity. Bipolar swings either side of the fader value, which
+        # is wrong for every parameter whose *zero* sits at 0.5: on `spin`
+        # it crosses the stopped point twice a cycle, so the figure turns
+        # one way and then the other. Unipolar folds the swing to 0..1 so
+        # it only ever adds — spin speeds up and settles back without
+        # reversing, and the same holds for tumble, orbit and the rest.
+        uni = p.get("lfo_uni", 0.0) > 0.5
+        if uni:
+            s = (s + 1.0) * 0.5
+
+        # dropoff: decay the swing across each cycle so it "settles".
+        # Applied after the fold so that in both polarities it decays
+        # toward the fader value rather than toward the middle of the
+        # unipolar range.
         drop = p.get("lfo_dropoff", 0.0)
         if drop > 1e-4:
             s *= (1.0 - drop * ph)
@@ -744,7 +995,10 @@ class ShapeEngine:
         lo, hi = PARAM_BOUNDS.get(tgt, (0.0, 1.0))
         eff = dict(p)
         base = p[tgt]
-        eff[tgt] = float(np.clip(base + s * depth * (hi - lo) * 0.5, lo, hi))
+        # Bipolar spends half its travel each way, unipolar all of it
+        # upward, so a given depth means the same total travel either way.
+        reach = depth * (hi - lo) * (1.0 if uni else 0.5)
+        eff[tgt] = float(np.clip(base + s * reach, lo, hi))
         return eff
 
     def set_text(self, string, style):
@@ -909,7 +1163,8 @@ class ShapeEngine:
                   "hypotrochoid": hypotrochoid, "wave": wave,
                   "harmonograph": harmonograph,
                   "polygon": polygon, "superformula": superformula,
-                  "maurer": maurer, "knot": knot}[name]
+                  "maurer": maurer, "knot": knot,
+                  "3d": shape3d}[name]
             # a generator may return a third array z (see `knot`); flat
             # shapes return two and sit at z = 0.
             res = fn(n, self.phase, p_mod)
