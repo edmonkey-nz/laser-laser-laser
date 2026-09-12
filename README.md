@@ -1,6 +1,6 @@
 # Laser! Laser Laser!
 
-![version](https://img.shields.io/badge/version-1.10.0-blueviolet)
+![version](https://img.shields.io/badge/version-1.11.0-blueviolet)
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![platform](https://img.shields.io/badge/platform-Ubuntu%20%7C%20Windows%20%7C%20macOS-informational)
 ![ai-code](https://img.shields.io/badge/AI%20coded-YES-orange)
@@ -8,6 +8,7 @@
 Realtime vector visuals synthesizer for the Helios Laser DAC and the
 LaserCube over the network. 
 - Lissajous figures, rose curves, hypotrochoids, waveforms, harmonographs,polygons/stars
+- Fluid dynamics shape - point vortices stirring a closed loop, in realtime
 - Text input
 - Draw polygons directly and save as patterns
 - Advanced 'duplicator' functionailty 
@@ -99,7 +100,7 @@ Python over the network, so it needs neither.
 
 ## Version
 
-Current release: **1.10.0** (see `CHANGELOG.md`). Run `python laserx3.py
+Current release: **1.11.0** (see `CHANGELOG.md`). Run `python laserx3.py
 --version` to check the installed version.
 
 ## License

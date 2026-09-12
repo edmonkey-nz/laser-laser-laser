@@ -8,11 +8,13 @@ blanking, which keeps the Helios pipeline simple and the beam bright.
 
 import numpy as np
 
+from fluid import FluidField
+
 TWO_PI = 2.0 * np.pi
 
 SHAPE_NAMES = ["lissajous", "rose", "hypotrochoid", "wave", "harmonograph",
                "polygon", "scope", "ilda", "vector", "text", "custom",
-               "superformula", "maurer", "knot", "3d"]
+               "superformula", "maurer", "knot", "3d", "fluid"]
 # NOTE: append only. The index is p["shape"], is persisted in patterns.json
 # and is bound to MIDI notes from NOTE_SHAPE_BASE — inserting mid-list
 # silently rewrites the shape of every saved pattern.
@@ -777,6 +779,10 @@ class ShapeEngine:
         self.paused = False       # freezes all time-driven motion
         self.on_load = None       # optional callback when a pattern loads
         self.test_frame = None    # when set, overrides all shapes (alignment)
+        # Vortex flow for the "fluid" shape. Built on first use rather than
+        # in __init__: it is the one shape carrying a simulation, and a
+        # session that never selects it should never pay for one.
+        self.fluid = None
 
     DISCRETE = {"shape", "mono", "flip_x", "flip_y",
                 "dup_mirror_x", "dup_mirror_y", "ilda_mode",
@@ -859,7 +865,9 @@ class ShapeEngine:
         These are the engine's *motion* state, not parameters: the spin
         angle, the hue rotation, the duplicator's orbit, the sweep
         oscillators, the 3D tumble, the shape phase that drives the ripple
-        and the comet, and the oscillator's own phase. None of them are
+        and the comet, the oscillator's own phase, and the fluid
+        simulation — whose vortices and loop are motion state exactly like
+        the accumulators above. None of them are
         stored in a pattern, so without this a recalled pattern renders at
         whatever attitude the session happened to have reached — a figure
         saved with spin stopped and a deliberate `rotate` offset came back
@@ -875,6 +883,8 @@ class ShapeEngine:
         self.lfo_phase = 0.0
         self.sweep_x_phase = 0.0
         self.sweep_y_phase = 0.0
+        if self.fluid is not None:
+            self.fluid.reset()
 
     def reset_params(self):
         """Master reset: every parameter back to its factory default.
@@ -1158,6 +1168,21 @@ class ShapeEngine:
             x, y = scope(n, self.phase, p_mod, audio)
         elif name == "custom":
             x, y = custom_polygon(n, self.phase, self.custom_points)
+        elif name == "fluid":
+            # The one stateful generator: a simulation stepped by dt rather
+            # than a function of the accumulating phase, so it lives on the
+            # engine and is called here instead of through the dict below.
+            # dt is already 0 when paused, which freezes the flow for free.
+            if self.fluid is None:
+                self.fluid = FluidField()
+            self.fluid.step(dt, p_mod)
+            fx, fy = self.fluid.loop()
+            # Resampled to the point budget here rather than in fluid.py:
+            # the simulation runs at its own fixed resolution so the physics
+            # does not change when the duplicator takes a slice of the
+            # budget, and arc-length spacing is a laser concern, not a
+            # fluid one.
+            x, y = _resample_closed(fx, fy, n)
         else:
             fn = {"lissajous": lissajous, "rose": rose,
                   "hypotrochoid": hypotrochoid, "wave": wave,

@@ -3,6 +3,28 @@
 All notable changes to this project are documented here. This project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.11.0] — 2026-09-13
+
+### Added
+
+- **Fluid shape.** A twelfth generated shape, and the first one that is a
+  simulation rather than an equation: point vortices stirring a closed
+  elastic loop, in a circular vessel. Ratio A is the number of vortices
+  (1–12), ratio B how hard they stir, and morph how much slack the loop
+  has — taut gives a droplet with billowing lobes, loose lets it stretch
+  into spirals and roll them up, which is the swirling-dye look. It draws
+  as one closed curve with no blanked travel moves, and composes with
+  everything downstream: ripple, tilt/tumble, duplicator, comet, dotify.
+
+  Because it holds state it responds to time rather than to a phase: PAUSE
+  freezes the flow where it is, and recalling a pattern restarts it from
+  its seed, deterministically. Audio routing reaches it through the
+  existing destinations — bass on ratio A adds stirrers, mid on morph
+  breathes the slack. It costs about 2.6 ms a frame against a 27 ms
+  budget, an order of magnitude more than any other shape, which is
+  affordable but is why the simulation runs at its own fixed resolution
+  instead of following the point count.
+
 ## [1.10.0] — 2026-09-11
 
 ### Added

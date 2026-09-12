@@ -118,11 +118,11 @@ If you are reporting a problem, send this file.
 
 ### Shapes
 
-Eleven generated shapes plus four external sources (ILDA, vectoriser,
+Twelve generated shapes plus four external sources (ILDA, vectoriser,
 text, and a hand-drawn custom polygon — covered under *Sources* below).
 The maths shapes — lissajous,
 rose, hypotrochoid, wave, harmonograph, polygon, scope, superformula,
-maurer, knot and 3d — share the
+maurer, knot, 3d and fluid — share the
 ratio A / ratio B / morph controls, which each shape interprets in its
 own way.
 
@@ -190,6 +190,27 @@ edges (a prism's uprights, a cone's slant lines) are drawn twice. That is
 the right trade: the alternative is a blanked jump, and closed curves
 with no blanked travel is the property the whole output path is built
 around.
+
+**Fluid**: a small fluid simulation rather than an equation — point
+vortices stirring a closed loop of "dye" around a circular vessel. Ratio A
+is the number of vortices (1 to 12), ratio B how hard they stir, and morph
+how much slack the loop is allowed: taut holds a droplet that billows and
+throws off tendrils, loose lets the flow stretch it into spirals and roll
+them up, which is the marbled, swirling-dye end. Four or more vortices
+interacting is a chaotic system, so it never repeats.
+
+It is the one shape that responds to *time* rather than to a phase, and
+that shows up in two places. PAUSE freezes the flow exactly where it is
+rather than holding a figure, and recalling a pattern starts the flow again
+from the beginning — the vortices are seeded the same way every time, so a
+saved pattern opens the way it did when you saved it, but the sequence
+after that is the simulation's, not the pattern's.
+
+It is also the most expensive shape here by a good margin — about 2.6 ms of
+a frame where the others take a fraction of that. At 800 points and 30 kpps
+there is 27 ms in a frame, so it is comfortable, but if you are running a
+high point count on a slow machine this is the shape that will show it
+first.
 
 ### Effects
 
