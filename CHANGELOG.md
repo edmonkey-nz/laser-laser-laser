@@ -3,6 +3,24 @@
 All notable changes to this project are documented here. This project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.12.0] — 2026-10-03
+
+### Added
+
+- **Optional single-shot frames in `helios.py`.** `HeliosOutput` and
+  `HeliosDAC` take `single_shot=False`. When true, frames are sent with
+  `HELIOS_FLAG_SINGLE_MODE`: the DAC plays each frame once and stops, so a
+  process that stops feeding it goes dark after the current frame instead of
+  replaying it until the watchdog (or the key switch) intervenes. The caller
+  must then send frames continuously. Because the DAC holds the last point
+  when a single-shot frame ends, that point is forced dark in this mode.
+  `blank()` is unchanged (dark frame, repeat mode). Diagnostics report the
+  frame mode.
+
+  Off by default: this app, laser-arcade and promptwaver behave exactly as
+  before. Added for topolaser, whose safety rules require single-shot frames;
+  re-copy `helios.py` to pick it up (it remains a verbatim shared file).
+
 ## [1.11.0] — 2026-09-13
 
 ### Added

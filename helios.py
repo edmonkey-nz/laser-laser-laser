@@ -14,6 +14,15 @@ Safety note: WriteFrame() without HELIOS_FLAG_SINGLE_MODE *repeats* the frame
 until the next one arrives. That is why blank() writes a dark frame in repeat
 mode rather than merely stopping — a stopped-but-unblanked DAC would sit there
 replaying whatever was last sent. See docs/lasercubeoutput.md §4.1/§4.3.
+
+single_shot=True (opt-in, default off) sends each frame with
+HELIOS_FLAG_SINGLE_MODE instead: the DAC plays it once and stops, so a caller
+that stops feeding frames goes dark after the current frame rather than
+replaying it. The caller must then send frames continuously. The DAC holds the
+last point when a single-shot frame ends, so in this mode the last point of
+every frame is forced dark here (on a copy; the caller's array is untouched).
+blank() still writes its dark frame in repeat mode, which is the safe state
+either way.
 """
 
 from __future__ import annotations
@@ -62,9 +71,12 @@ def _lib_path():
 class HeliosDAC:
     """Manages one Helios DAC (device 0 by default)."""
 
-    def __init__(self, dac_num=0, lib_path=None):
+    def __init__(self, dac_num=0, lib_path=None, single_shot=False):
         self.lib = ctypes.cdll.LoadLibrary(lib_path or _lib_path())
         self.dac_num = dac_num
+        self.single_shot = bool(single_shot)
+        self._frame_flags = (HELIOS_FLAG_SINGLE_MODE if self.single_shot
+                             else HELIOS_FLAGS_DEFAULT)
         self.num_devices = self.lib.OpenDevices()
         if self.num_devices <= dac_num:
             self.lib.CloseDevices()
@@ -101,12 +113,16 @@ class HeliosDAC:
         packed['g'] = points_np[:, 3]
         packed['b'] = points_np[:, 4]
         packed['i'] = points_np[:, 5]
+        if self.single_shot and n:
+            # The DAC parks on the last point after a single-shot frame: dark.
+            packed['r'][-1] = packed['g'][-1] = packed['b'][-1] = 0
+            packed['i'][-1] = 0
         ctypes.memmove(frame, packed.tobytes(), ctypes.sizeof(frame))
 
         if not self._wait_ready(timeout):
             return False
         return self.lib.WriteFrame(self.dac_num, int(pps),
-                                   HELIOS_FLAGS_DEFAULT, frame, n) == 1
+                                   self._frame_flags, frame, n) == 1
 
     def _wait_ready(self, timeout):
         """Poll GetStatus until the DAC will accept a frame. Sleeps rather
@@ -186,8 +202,8 @@ class HeliosOutput:
     name = "helios"
     paces_loop = True
 
-    def __init__(self, dac_num=0, lib_path=None):
-        self.dac = HeliosDAC(dac_num, lib_path=lib_path)
+    def __init__(self, dac_num=0, lib_path=None, single_shot=False):
+        self.dac = HeliosDAC(dac_num, lib_path=lib_path, single_shot=single_shot)
         self.num_devices = self.dac.num_devices
         self.last_points = 0
 
@@ -211,6 +227,8 @@ class HeliosOutput:
         rather than padding the panel with unknowns.
         """
         rows = [("device", f"Helios DAC #{self.dac.dac_num}", ""),
+                ("frame mode", "single-shot" if self.dac.single_shot
+                 else "repeat", ""),
                 ("devices found", str(self.num_devices),
                  "ok" if self.num_devices else "bad")]
         try:

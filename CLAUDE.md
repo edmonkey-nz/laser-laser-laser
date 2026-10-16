@@ -211,3 +211,52 @@ points, per-pattern pps/points) and are re-applied through
 blocks on `GetStatus`, so when the laser is running the DAC's point clock
 paces the render loop — no timer needed. Without a DAC the loop sleeps to hit
 the target frame time instead.
+
+### Threads and the GIL — leads from promptwaver, NOT yet measured here
+
+promptwaver (same author, same laptop, same Python) measured its way through a
+thread-contention problem in 2026-09. Its conclusions are recorded here because
+this app has the same shape; **none of the points below has been measured in
+this repo** — treat them as hypotheses to test, not facts.
+
+**The shape.** Five threads share one GIL: the render loop (main thread), the
+LaserCube sender (`lasercube_output.py`, wakes every 2ms), the `AudioAnalyzer`
+input callback (`laserx3.py`), the aiohttp thread (`webui.py`) and the
+vectoriser camera thread (`vectorise.py`). No `sys.setswitchinterval` call
+exists, so CPython hands the GIL over at its 5ms default.
+
+- **The sender is the thread at risk.** It is paced and latency-sensitive —
+  exactly the role promptwaver's audio producer plays. There, a render thread
+  saturating the GIL starved the producer (36% of blocks missed at the 5ms
+  default with render at 2x its budget) and `sys.setswitchinterval(0.0005)`
+  took it to 0.0% for ~3% of frame rate. Here the symptom would be the
+  LaserCube ring buffer draining → beam pauses, most likely when fluid sim or
+  the vectoriser is heavy. **Test before changing:** load the render loop
+  heavily against `scripts/lasercube_sim.py` and watch `rx_buffer_free`. If it
+  doesn't underrun, don't add the call.
+- **Don't reach for thread priority.** promptwaver tested `SCHED_FIFO` on the
+  starving thread: noise (36.1% → 33.3%). A thread with OS priority still waits
+  on the GIL, and priority needs per-OS permissions a released binary can't
+  assume.
+- **Keep `ctypes.cdll` in `helios.py`.** `CDLL` releases the GIL for the
+  duration of each foreign call, so the render thread blocking on `GetStatus`
+  lets everything else run. `PyDLL` would hold it through every blocking wait.
+- **`AudioAnalyzer._cb` does FFT and band maths inside the PortAudio callback.**
+  promptwaver moved all work out of its (output) callback for this reason.
+  Lower stakes here — it's an input stream, so a late callback means jittery
+  audio reactivity, not an audible dropout.
+
+**Measuring, in general.** Per-point Python/numpy loops are dispatch-bound, not
+arithmetic-bound: in promptwaver, 300 tiny numpy ops took 1.44ms while one op
+over 21x the data took 0.067ms. Batching beats faster hardware. Measure with the
+app's real thread shape — two Python threads produced *less* total work than
+one. Extra cores, RAM and GPU did nothing for that app's frame rate.
+
+**Before trusting any timing on the dev laptop,** check the CPU isn't capped:
+compare `scaling_max_freq` with `cpuinfo_max_freq` under
+`/sys/devices/system/cpu/cpu*/cpufreq/`. On 2026-09-16, 11 of 12 cores were
+found pinned at 2.1GHz of 4.06GHz, halving everything; the fix does not survive
+a reboot. Read the real clock from `/proc/cpuinfo` MHz — `scaling_cur_freq` is
+only a hint on amd-pstate. Numbers recorded before that date (e.g. the sender
+comment's "~320 frames/s against a 31 fps render loop") may have been taken at
+half clock.
