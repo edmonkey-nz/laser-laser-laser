@@ -2,8 +2,8 @@
 lasercube_output.py — LaserCube / LaserCube Ultra output over the network.
 
 CANONICAL: laser-laser-laser/lasercube_output.py — sync, do not fork.
-Depends only on `laser_output`, numpy and the standard library, so it copies
-into laser-arcade and promptwaver unchanged. Python 3.9 compatible.
+Depends only on `laser_output`, numpy and the standard library, so it can be
+dropped into another project unchanged. Python 3.9 compatible.
 
 It deliberately knows nothing about this project: no engine, no settings, no
 web UI. The arm gate, the brightness ceiling and the watchdog all live
@@ -155,8 +155,8 @@ def pack_points(frame, order="xyrgb"):
     SafeOutput's arm gate zeroes all four columns together.
 
     Built as one numpy structured array and taken to bytes in a single call.
-    A per-point Python loop here is the exact mistake that cost promptwaver
-    431 ms/frame against a 22 ms budget.
+    A per-point Python loop is dispatch-bound: one measured in another
+    render pipeline took 431 ms/frame against a 22 ms budget.
     """
     n = len(frame)
     out = np.empty(n, dtype=np.dtype([('a', '<u2'), ('b', '<u2'), ('c', '<u2'),
@@ -279,8 +279,8 @@ class LaserCubeOutput:
     slot and returns — the same latest-wins handoff `WebUI.publish` uses. A
     daemon sender thread streams against the device's reported free buffer
     space, so the render thread cannot be blocked by the network. That matters
-    beyond this project: promptwaver runs a realtime audio callback in the same
-    process, and a blocked render thread there becomes an audible xrun.
+    most to a host running a realtime audio callback in the same process,
+    where a blocked render thread becomes an audible xrun.
 
     Because the sender is independent, it also keeps the device buffer topped
     up between frames rather than emitting one burst per frame, which is what

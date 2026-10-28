@@ -3,6 +3,27 @@
 All notable changes to this project are documented here. This project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.12.1] — 2026-10-27
+
+### Changed
+
+- **The repo is standalone.** Code comments and docs no longer name or cite
+  other projects. `laser_output.py`, `helios.py` and `lasercube_output.py`
+  are still written to be dropped into other projects unchanged, and
+  `docs/PORTING.md` is now a general guide to doing that. Comment and
+  documentation changes only; no behaviour changes.
+
+### Safety
+
+- **`docs/SAFETY.md` reviewed against 1.12.0.** It now says that the
+  watchdog blanks but does not disarm, so an armed output comes back on by
+  itself when a stalled render loop recovers. Also new: BLANK is not DISARM,
+  `--max-brightness` overrides the saved ceiling, ILDA dwell checks are
+  advisory only, the Helios frame modes, LaserCube stall and blank
+  behaviour, the arm log in `error.txt`, and the 1.7–1.11 guards against a
+  parked beam. Fixed a wrong cross-reference (§1 for the procedure in §2)
+  in SAFETY.md and the manual.
+
 ## [1.12.0] — 2026-10-03
 
 ### Added

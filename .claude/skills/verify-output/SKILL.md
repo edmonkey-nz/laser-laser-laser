@@ -127,7 +127,7 @@ Repo convention (CONTRIBUTING.md): **every code change bumps `__version__` in
 `laserx3.py` and adds a `CHANGELOG.md` entry.**
 
 If you changed `laser_output.py`, `helios.py` or `lasercube_output.py`,
-they are copied verbatim into laser-arcade and promptwaver — keep them
+they are written to be dropped into other projects unchanged — keep them
 importable standalone (numpy + stdlib only, Python 3.9) and see
 [docs/PORTING.md](../../../docs/PORTING.md).
 

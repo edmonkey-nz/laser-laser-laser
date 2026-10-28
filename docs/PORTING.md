@@ -1,7 +1,7 @@
 # Porting the output layer to another project
 
 How to adopt `laser_output.py`, `helios.py` and `lasercube_output.py` in
-**laser-arcade**, **promptwaver**, or anything else that drives a laser.
+another Python project that drives a laser.
 
 Read [SAFETY.md](SAFETY.md) first if you haven't. This document is about
 mechanics; that one is about what the code is for.
@@ -10,26 +10,17 @@ mechanics; that one is about what the code is for.
 
 ## 1. Why bother
 
-The survey that prompted this: all three projects drive a Helios, none share
-any code, and each had a *different* fraction of the safety story.
+Every project that drives a laser needs the same safety half: a real
+`blank()`, an arm gate, a brightness ceiling, a watchdog, and blanking on
+every exit path including `SIGTERM`. It is easy to end up with some of these
+and not others, and the missing ones are only discovered when something goes
+wrong. This is the layer where duplication costs real safety, so it is
+written once.
 
-| | laser-laser-laser | laser-arcade | promptwaver |
-|---|---|---|---|
-| Real `blank()` primitive | ✗ | ✗ | ✓ |
-| Arm/disarm gate | ✗ | ✗ | ✓ |
-| Brightness ceiling | ✗ | ✓ | ✗ |
-| Bounded DAC wait | ✓ | n/a | ✓ |
-| `atexit` / SIGTERM blank | ✗ | ✗ | ✗ |
-| Watchdog | ✗ | ✗ | ✗ |
-
-**Nobody had the exit/watchdog half. Everyone had a different half of the
-rest.** That is the whole argument: this is the layer where duplication was
-costing real safety, so it gets written once.
-
-What is *not* shared, deliberately: path planning. All three planners are
-meaningfully different — greedy nearest-neighbour with adaptive coarsening in
-laser-arcade, arc-length resampling with aspect letterboxing in promptwaver —
-and they should stay that way. Don't let the shared layer grow into a planner.
+What is *not* shared, deliberately: path planning. Planners differ
+legitimately between projects — nearest-neighbour ordering, arc-length
+resampling, letterboxing — and they should stay that way. Don't let the
+shared layer grow into a planner.
 
 ---
 
@@ -47,21 +38,21 @@ Each carries a `# CANONICAL: laser-laser-laser/<name>` header. **This repo is
 upstream.** Fix bugs here and re-copy; don't fork. A bug in
 `laser_output.py` is a safety bug in every project that has it.
 
-An installable package was considered and rejected: two of the three projects
-freeze with PyInstaller and one has no build step at all, so a path dependency
-breaks more than it solves.
+An installable package was considered and rejected: hosts that freeze with
+PyInstaller, or have no build step at all, are better served by three flat
+files than by a path dependency.
 
 ### Constraints these files hold to
 
 Keep them true or the copy stops being a copy:
 
 - **numpy + stdlib only.** Nothing from any host project.
-- **Python 3.9 compatible** — laser-arcade's floor. `from __future__ import
-  annotations` at the top; no `X | None` at runtime, no `match`.
-- **Library path is injectable.** `HeliosDAC(lib_path=...)`, because each
-  project stages the `.so` differently — bundled as PyInstaller `datas` here,
-  deliberately *not* bundled in laser-arcade, `HELIOS_LIB` env var in
-  promptwaver.
+- **Python 3.9 compatible.** `from __future__ import annotations` at the
+  top; no `X | None` at runtime, no `match`.
+- **Library path is injectable.** `HeliosDAC(lib_path=...)`, because hosts
+  stage the `.so` differently — bundled as PyInstaller `datas` here, but a
+  host may leave it unbundled and search for it, or take it from an
+  environment variable.
 
 ---
 
@@ -83,8 +74,8 @@ class LaserOutput(Protocol):
 
 **Frame format: numpy `(N,6)` int32 — `x, y` 0..4095, `r, g, b, i` 0..255.**
 
-Not normalised floats. All three projects already produce or consume the
-Helios point layout, so this avoids rewriting two working pipelines. If your
+Not normalised floats: it is the Helios point layout, which most laser
+pipelines already produce or consume. If your
 pipeline *is* float-native, convert at your edge with
 `laser_output.from_normalised(xy, rgb, i)`.
 
@@ -144,84 +135,59 @@ the entire mechanism.
 
 ---
 
-## 5. Per-project notes
+## 5. Adapting an existing pipeline
 
-### promptwaver (LaserFlow)
-
-Nearly free — its output interface already matches (`write`/`blank`/`close`/
-`.name`/`.last_points`/`make_output`); the protocol was derived from it.
-
-- Replace the inline `HeliosPoint` and `_wait_ready` in
-  `promptwaver/output/ilda.py` with the shared backend. Its docstring already
-  says "drop your existing laserx3 wrapper in here if you prefer" — that is
-  the seam.
-- **Keep the planner untouched.** Arc-length resampling, aspect letterboxing
-  and keystone stay where they are, upstream of `out.write()`.
-- Its `laser_on` gate becomes `SafeOutput.arm()`/`disarm()`. Keep the
-  behaviour where disarming is unfaded and same-tick.
-- `i` convention there is 255 lit / 0 blank. Keep it; just be consistent.
-- **Watch the audio thread.** The render loop shares a process with a realtime
-  `sounddevice` callback, and two regressions are documented in-tree from
-  exactly this: a per-point Python packing loop holding the GIL, and a naked
-  `while: pass` spin on `GetStatus`. The shared code sleeps rather than spins
-  and packs with numpy in one shot — don't undo either. Prefer the LaserCube
-  backend here if you have the choice: its `write()` never touches a socket.
-
-Gains: atexit/SIGTERM blanking, watchdog, brightness ceiling, diagnostics.
-
-### laser-arcade
-
-Needs a small adapter, because its output path is pure Python — a list of
-`(x, y, r, g, b)` 5-tuples already in DAC units, with no `i` channel.
+**Point lists.** A pure-Python pipeline producing `(x, y, r, g, b)` tuples in
+DAC units needs a one-function adapter:
 
 ```python
 import numpy as np
 
 def to_frame(points):
-    """laser-arcade LaserPoint list -> (N,6) int32."""
+    """List of (x, y, r, g, b) in DAC units -> (N,6) int32."""
     a = np.asarray(points, dtype=np.int32)        # (N,5): x,y,r,g,b
     frame = np.empty((len(a), 6), dtype=np.int32)
     frame[:, :5] = a
-    frame[:, 5] = a[:, 2:5].max(axis=1)           # i = max(r,g,b), its convention
+    frame[:, 5] = a[:, 2:5].max(axis=1)           # i = max(r,g,b)
     return frame
 ```
 
-numpy is already a dependency (`numpy>=1.24`), it just isn't used in the
-output path yet.
+- **Keep your existing `i` convention** (`max(r,g,b)`, or 255 lit / 0 blank).
+  Changing it changes brightness on the rig for no reason anyone will
+  remember.
+- **Keep your planner untouched.** Resampling, letterboxing, keystone and the
+  rest stay where they are, upstream of `out.write()`.
+- **An existing `laser_on` gate becomes `SafeOutput.arm()`/`disarm()`.** Keep
+  disarming unfaded and same-tick.
+- **A creative `brightness` control stays.** The ceiling is separate and sits
+  below it.
+- **Don't double-buffer.** If your old output already runs a writer thread
+  with latest-wins buffering, either keep it and set `paces_loop = False`, or
+  drop it and let the blocking Helios path pace the loop — not both.
+- **Pass `lib_path` explicitly** if your build does not bundle the Helios
+  library next to `helios.py`.
 
-- **`i = max(r, g, b)` is its existing convention** — keep it, or brightness
-  changes on that rig for no reason anyone will remember.
-- Its `HeliosOutput` already runs a writer thread with latest-wins buffering.
-  Either keep that and set `paces_loop = False`, or drop it and let the
-  blocking Helios path pace the pygame loop — but not both.
-- Its global `brightness` multiplier in `Settings.beam()` is a *creative*
-  control, the same as this project's. Leave it; the ceiling is separate and
-  sits below it.
-- It ships PyInstaller `--onefile` with the `.so` *not* bundled, so pass
-  `lib_path` explicitly from its existing `_search_dirs` logic.
-- Python 3.9 floor comes from here. It is why the shared files avoid modern
-  syntax.
+**A realtime audio callback in the same process** is the case to be careful
+of. A per-point Python packing loop holding the GIL, or a naked
+`while: pass` spin on `GetStatus`, will starve it into audible dropouts. The
+shared code sleeps rather than spins and packs with numpy in one shot — don't
+undo either. Prefer the LaserCube backend if you have the choice: its
+`write()` never touches a socket.
 
-Gains: atexit/SIGTERM blanking, watchdog, a real `blank()`, arm gate,
-diagnostics, and the LaserCube backend for free.
-
-### ilda_export
-
-**Out of scope.** It is a Cinema 4D plugin that writes `.ild` files and must
-stay Python 2.7 compatible with no third-party deps. It does not drive a DAC.
-Its overlap with `ilda.py` is file-codec duplication — a separate question,
-and the 2.7 constraint would poison this package if you merged them.
+**Out of scope:** anything that writes `.ild` files rather than driving a
+DAC, and anything that must run on Python 2.7. File-codec code is a separate
+question, and a 2.7 constraint would poison these files.
 
 ---
 
 ## 6. Verifying the port
 
-Per project, before you trust it. None of this needs a laser:
+Before you trust it. None of this needs a laser:
 
 1. App starts, comes up **disarmed**, ceiling 5%.
 2. Disarmed produces zero-colour frames — not an absence of frames.
 3. Ceiling holds with your brightness control at maximum.
-4. All four exit paths blank: Ctrl-C, `kill -TERM`, an exception in the loop,
+4. Every exit path blanks: Ctrl-C, `kill -TERM`, an exception in the loop,
    `atexit` alone.
 5. Watchdog fires on an injected `sleep(2)` and releases on recovery.
 6. Frame rate unregressed versus before the port.
@@ -238,10 +204,11 @@ There is no tooling for this and deliberately no build step. The discipline is
 manual:
 
 ```bash
-diff laser_output.py ../laser-arcade/laser_output.py
-sha256sum laser_output.py ../*/laser_output.py
+sha256sum laser_output.py helios.py lasercube_output.py \
+          /path/to/your/project/{laser_output,helios,lasercube_output}.py
 ```
 
 If you find yourself wanting to change one of these files *for one project*,
 that is the signal the change belongs behind a constructor argument instead —
-`lib_path` and `max_brightness` are both there for exactly that reason.
+`lib_path`, `max_brightness` and `single_shot` are all there for exactly that
+reason.

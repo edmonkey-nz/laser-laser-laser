@@ -26,7 +26,7 @@ Default MIDI CC map (channel-agnostic):
   Notes from C1 (36) upward select shapes.
 """
 
-__version__ = "1.12.0"
+__version__ = "1.12.1"
 
 import argparse
 import sys
@@ -36,7 +36,6 @@ import time
 # Installed before anything else is imported, deliberately: a missing bundled
 # module or a broken native dependency is one of the things the log exists to
 # diagnose, and a handler installed after the failing import never runs.
-# (promptwaver's PACKAGING.md §4.)
 import crashlog
 crashlog.install(version=__version__)
 crashlog.step("interpreter up, importing dependencies")
@@ -422,14 +421,13 @@ class Preview:
     A second place to arm a laser is a second place for the two to disagree
     about whether it is armed.
 
-    Built in pygame rather than the tkinter that promptwaver's PACKAGING.md
-    recommends, because its two premises do not hold here. pygame is already
-    bundled for this window, where tkinter would add tcl/tk plus a
-    `python3-tk` step in Linux CI that silently degrades to console-only if
-    forgotten. And the doc's central rule — Tk must own the main thread —
-    inverts this app: the render loop owns the main thread on purpose,
-    because the Helios paces it by blocking in GetStatus and blank-on-exit
-    hangs off that.
+    Built in pygame rather than tkinter, the usual choice for a launcher
+    window, for two reasons. pygame is already bundled for this window,
+    where tkinter would add tcl/tk plus a `python3-tk` step in Linux CI that
+    silently degrades to console-only if forgotten. And Tk must own the main
+    thread, which inverts this app: the render loop owns the main thread on
+    purpose, because the Helios paces it by blocking in GetStatus and
+    blank-on-exit hangs off that.
 
     The beam is still a keystroke away on `v`, full-window, which is what
     this window used to be.
@@ -986,7 +984,7 @@ def main():
             # Arm transitions go in the log. Polled rather than hooked so
             # every route is covered — browser, MIDI, panel button, keyboard
             # — and so laser_output.py, which is copied verbatim into the
-            # sibling projects, needs no knowledge of this module.
+            # other projects, needs no knowledge of this module.
             if out.armed != armed_was:
                 armed_was = out.armed
                 crashlog.step(f"output {'ARMED' if out.armed else 'disarmed'}"

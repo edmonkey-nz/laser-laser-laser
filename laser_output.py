@@ -2,9 +2,9 @@
 laser_output.py — the shared laser output safety layer.
 
 CANONICAL: laser-laser-laser/laser_output.py — sync, do not fork.
-Copied verbatim into laser-arcade and promptwaver. It must stay importable on
-its own: stdlib + numpy only, nothing from any host project, Python 3.9
-compatible. A bug in here is a safety bug in three places.
+Written to be dropped into other projects unchanged. It must stay importable
+on its own: stdlib + numpy only, nothing from any host project, Python 3.9
+compatible. A bug in here is a safety bug everywhere it has been copied.
 
 What lives here is exactly the part every project needs and none of them
 should write twice: the arm gate, the brightness ceiling, the watchdog, and

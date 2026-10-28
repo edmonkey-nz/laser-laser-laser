@@ -393,7 +393,7 @@ fade. Untick it only for a mono projector with real analog modulation.
 > **The brightness ceiling does not work on a switched projector.** It caps
 > output by scaling amplitude, and a diode that is switched has none — at a
 > 5% ceiling it still fires at full power while the header reads 5%. The
-> bring-up procedure in `docs/SAFETY.md` §1 assumes an analog device; on this
+> bring-up procedure in `docs/SAFETY.md` §2 assumes an analog device; on this
 > hardware use the key switch, shutter, eyewear and distance instead, and
 > treat every armed frame as full power.
 
@@ -688,9 +688,9 @@ which is why blanking writes a dark frame rather than merely calling
 `Stop()` — a stopped-but-unblanked DAC sits there replaying whatever was
 last sent.
 
-`laser_output.py` and `helios.py` are written to be copied verbatim into
-the sibling laser projects, so they depend on nothing but numpy and the
-standard library.
+`laser_output.py`, `helios.py` and `lasercube_output.py` are written to be
+dropped into other projects unchanged, so they depend on nothing but numpy
+and the standard library.
 
 ## Project layout
 
@@ -703,7 +703,7 @@ live in `docs/` and `scripts/`.
 
 - `laserx3.py` — main app (render loop, MIDI, audio, preview)
 - `laser_output.py` — output safety layer (ARM gate, brightness ceiling,
-  watchdog, blank-on-exit); shared verbatim with the sibling projects
+  watchdog, blank-on-exit); reusable in other projects unchanged
 - `helios.py` — Helios DAC backend (USB, ctypes over libHeliosDacAPI)
 - `lasercube_output.py` — LaserCube backend (network, pure Python UDP);
   `scripts/lasercube_sim.py` is a fake device for testing without hardware

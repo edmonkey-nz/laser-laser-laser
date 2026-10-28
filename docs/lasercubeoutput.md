@@ -1,9 +1,8 @@
 # LaserCubeOutput — network output backend spec
 
 A reusable laser output backend targeting the **LaserCube / LaserCube Ultra**
-over its **network (Ethernet/WiFi) protocol**, intended to be shared across
-multiple projects (LaserFlow/AuroraVJ, Laser Arcade, Laser! Laser! Laser!)
-rather than reimplemented per project.
+over its **network (Ethernet/WiFi) protocol**, written so it can be dropped
+into other projects rather than reimplemented per project.
 
 > ⚠️ **Built in 1.6.0, but not yet run against real hardware.** The protocol
 > below is resolved and cited against reference implementations (§2.2), and
@@ -170,7 +169,7 @@ lasercube_output.py   # this spec — not yet written
 ```
 
 `laser_output.py` imports nothing from any host project and stays Python 3.9
-compatible, because laser-arcade's floor is 3.9.
+compatible, so it can be dropped into older codebases.
 
 ### Frame interchange
 
@@ -273,7 +272,7 @@ send points
 
 Never block the render thread waiting for buffer space — drop the frame
 instead. A dropped frame is a visual hiccup; a blocked render thread cascades
-into the audio thread (see LaserFlow's history of exactly this class of bug).
+into any realtime audio thread sharing the process.
 
 ### 5.2 Avoid inter-frame gaps
 
@@ -284,9 +283,9 @@ waiting for a frame boundary.
 
 ### 5.3 Performance
 
-Pack with numpy, not per-point Python. LaserFlow already learned this the hard
-way: a per-point Python loop in the planner took **431 ms/frame against a 22 ms
-budget** and starved the audio thread. Build the whole frame as a numpy
+Pack with numpy, not per-point Python. A per-point Python loop measured in
+another render pipeline took **431 ms/frame against a 22 ms budget** and
+starved its audio thread. Build the whole frame as a numpy
 structured array and take `.tobytes()` once.
 
 ### 5.4 Dry-run mode

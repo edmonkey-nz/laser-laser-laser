@@ -6,9 +6,9 @@ Expects libHeliosDacAPI.so next to this file (or HeliosLaserDAC.dll on Windows)
 unless an explicit lib_path is passed.
 
 CANONICAL: laser-laser-laser/helios.py — sync, do not fork.
-Shared with laser-arcade and promptwaver. Keep it dependency-free beyond
-numpy + stdlib, keep the library search injectable (each project stages the
-shared library differently), and keep Python 3.9 compatible.
+Written to be dropped into other projects unchanged. Keep it dependency-free
+beyond numpy + stdlib, keep the library search injectable (a host may stage
+the shared library its own way), and keep Python 3.9 compatible.
 
 Safety note: WriteFrame() without HELIOS_FLAG_SINGLE_MODE *repeats* the frame
 until the next one arrives. That is why blank() writes a dark frame in repeat

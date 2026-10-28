@@ -13,10 +13,11 @@ hope it's useful to other laser/synth tinkerers.
   touching anything on the output path. In particular: the arm gate and
   the brightness ceiling are the last transform before the device, so a
   new output transform goes *before* them, never after.
-- **`laser_output.py` and `helios.py` are copied verbatim into two sibling
-  projects** (laser-arcade, promptwaver). Keep them importable standalone —
+- **`laser_output.py`, `helios.py` and `lasercube_output.py` are written to
+  be dropped into other projects unchanged** (see
+  [docs/PORTING.md](docs/PORTING.md)). Keep them importable standalone —
   numpy and stdlib only, nothing from this project, Python 3.9 compatible.
-  A bug in `laser_output.py` is a safety bug in three repositories.
+  A bug in `laser_output.py` is a safety bug everywhere it has been copied.
 - **No hardware? You can still test the LaserCube path.**
   `scripts/lasercube_sim.py` is a fake device that answers on the real
   ports and can be told to stall, drop packets, refuse to enable output or
