@@ -23,7 +23,9 @@ A few things to know:
 - **Linux needs `libusb-1.0-0` installed** (`sudo apt install
   libusb-1.0-0` if it isn't already — most desktops have it). The Ubuntu
   udev rule (`heliosdac.rules`) is included in the zip; see *Ubuntu
-  setup* below for how to install it.
+  setup* below for how to install it. PortAudio (audio input) is
+  bundled since 1.12.2; the 1.12.0 binary crashes on start-up without it,
+  so on that release run `sudo apt install libportaudio2` first.
 - **macOS build is Apple Silicon (arm64) only.** Older Intel Macs aren't
   covered by the current workflow.
 - These are the same source files as this repo at that tag — nothing
@@ -44,7 +46,7 @@ Create a virtual environment in the project folder first, then install
 into that:
 
 ```bash
-sudo apt install libusb-1.0-0 python3-venv python3-full
+sudo apt install libusb-1.0-0 libportaudio2 python3-venv python3-full
 
 cd laser-laser-laser          # the project folder
 python3 -m venv .venv

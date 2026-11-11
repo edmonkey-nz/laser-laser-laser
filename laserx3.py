@@ -26,7 +26,7 @@ Default MIDI CC map (channel-agnostic):
   Notes from C1 (36) upward select shapes.
 """
 
-__version__ = "1.12.1"
+__version__ = "1.12.2"
 
 import argparse
 import sys
@@ -350,16 +350,54 @@ class MidiInput:
             self.port.close()
 
 
+def _bundled_portaudio_fallback():
+    """Frozen Linux build: let sounddevice find the PortAudio we bundled.
+
+    sounddevice locates PortAudio with ctypes.util.find_library("portaudio"),
+    which on Linux only searches the system (ldconfig cache, or gcc/ld if
+    installed) — never the bundle's _internal/ folder. On a machine without
+    libportaudio2 the import then fails even though the release ships the
+    library. This wraps find_library so the system copy still wins when
+    there is one, and the bundled copy is used only when there isn't.
+    """
+    if not (getattr(sys, "frozen", False) and sys.platform.startswith("linux")):
+        return
+    import ctypes.util
+    import glob
+    import os
+    bundled = sorted(glob.glob(os.path.join(sys._MEIPASS, "libportaudio.so*")))
+    if not bundled or getattr(ctypes.util.find_library, "_laser_wrapped", False):
+        return
+    system_find = ctypes.util.find_library
+
+    def find_library(name):
+        found = system_find(name)
+        if found is None and name == "portaudio":
+            return bundled[0]
+        return found
+
+    find_library._laser_wrapped = True
+    ctypes.util.find_library = find_library
+
+
 class AudioAnalyzer:
     """Grabs the default input device; publishes rms/bass/mid/high + waveform."""
 
     def __init__(self, samplerate=44100, blocksize=1024):
         self.data = None
         self._lock = threading.Lock()
+        _bundled_portaudio_fallback()
         try:
             import sounddevice as sd
         except ImportError:
             print("[audio] sounddevice not installed — audio disabled")
+            self.stream = None
+            return
+        except Exception as e:
+            # sounddevice raises OSError at import when the PortAudio shared
+            # library is missing. Audio is optional: lose it, keep running.
+            print(f"[audio] {e} — audio disabled "
+                  "(on Linux: sudo apt install libportaudio2)")
             self.stream = None
             return
         self.samplerate = samplerate

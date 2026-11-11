@@ -3,6 +3,20 @@
 All notable changes to this project are documented here. This project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.12.2] — 2026-11-11
+
+### Fixed
+
+- **The Linux release no longer dies on start-up without PortAudio.** On a
+  machine without `libportaudio2` (a fresh Ubuntu, for one) the 1.12.0
+  binary crashed with `OSError: PortAudio library not found`: the audio
+  import only caught `ImportError`. Any failure to load the audio library
+  now disables audio input with a console message and the app carries on.
+- **The Linux release bundles PortAudio.** The CI runner now installs
+  `libportaudio2` so PyInstaller packs it into `_internal/`, the build fails
+  if it is missing, and the frozen app falls back to that copy when the
+  system has none (a system copy still wins when present).
+
 ## [1.12.1] — 2026-10-27
 
 ### Changed

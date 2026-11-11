@@ -41,6 +41,14 @@ jobs:
         with:
           python-version: "3.12"
 
+      # sounddevice's PyPI wheels carry PortAudio for Windows and macOS
+      # only. On Linux PyInstaller's sounddevice hook bundles whatever system
+      # copy it finds, so the runner needs one or the release ships without
+      # audio input (1.12.0 did, and died on start-up on a fresh Ubuntu).
+      - name: Install PortAudio (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y libportaudio2
+
       - name: Install Python dependencies
         shell: bash
         run: |
@@ -104,6 +112,11 @@ jobs:
       - name: Build with PyInstaller
         shell: bash
         run: pyinstaller --noconfirm pyinstaller.spec
+
+      - name: Check PortAudio is bundled (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: ls -l dist/laser-laser-laser/_internal/libportaudio.so*
 
       # (the Linux udev rule is bundled by pyinstaller.spec, so local and CI
       # builds produce the same folder — no copy step needed here)
