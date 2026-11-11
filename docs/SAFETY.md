@@ -208,8 +208,7 @@ Since 1.12.0 `helios.py` can instead send **single-shot** frames
 (`HeliosOutput(single_shot=True)`): the DAC plays each frame once and stops,
 so a process that stops feeding it goes dark after the current frame. The DAC
 parks on the final point of a single-shot frame, so that point is forced dark
-in this mode. **This app does not enable it**: it is for hosts that need a
-dead process to go dark without relying on the watchdog.
+in this mode. **This app does not enable it** — it was added for topolaser.
 TEST DEVICE reports which mode is in use.
 
 ### Device diagnostics
@@ -358,11 +357,12 @@ brightness — must preserve these properties:
   the content actually is. Dimming the preview would make the ceiling
   invisible rather than obvious.
 
-`laser_output.py`, `helios.py` and `lasercube_output.py` are **written to be
-dropped into other projects unchanged** ([PORTING.md](PORTING.md)). Keep them
+`laser_output.py`, `helios.py` and `lasercube_output.py` are **copied verbatim
+into the sibling laser projects** (laser-arcade, topolaser). Keep them
 importable standalone — numpy and stdlib only, nothing project-specific,
-Python 3.9 compatible. A bug in `laser_output.py` is a safety bug everywhere
-it has been copied.
+Python 3.9 compatible. Change them here only, then re-copy and compare with
+`sha256sum`. A bug in `laser_output.py` is a safety bug in three repositories
+at once.
 
 The full requirements these implement are
 [lasercubeoutput.md §4](lasercubeoutput.md).
@@ -373,9 +373,6 @@ The full requirements these implement are
 
 Honest list, kept current:
 
-- **None of this has been run against real hardware.** The Helios path was
-  developed with no DAC attached; the LaserCube path was developed against a
-  simulator. Verify per §5 before trusting either.
 - **The LaserCube wire format is reverse-engineered.** Three independent
   sources agree on the point layout, but agreement is not the same as
   verification. The first frame on real hardware is the test. If it comes out
