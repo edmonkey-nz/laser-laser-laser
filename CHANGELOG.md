@@ -3,6 +3,23 @@
 All notable changes to this project are documented here. This project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.12.4] — 2026-11-11
+
+### Added
+
+- **A `README.txt` at the top of every release zip**, one per OS
+  (`docs/release/README-*.txt`), with the first-run steps. On Linux it
+  leads with running `./install-udev.sh` once for the Helios DAC. CI fails
+  the build if it is missing.
+- **The GitHub release page carries the same first steps** above the
+  generated notes: run `install-udev.sh` on Linux, the unsigned-binary
+  workarounds, and that output starts disarmed.
+
+### Changed
+
+- README.md and INSTALL.md say up front that Linux with a Helios needs
+  `install-udev.sh` once per computer.
+
 ## [1.12.3] — 2026-11-11
 
 ### Added

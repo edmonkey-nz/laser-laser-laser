@@ -11,7 +11,9 @@ one each for Ubuntu, Windows and macOS (Apple Silicon), built automatically
 by GitHub Actions (`.github/workflows/build.yml`) whenever a version tag is
 pushed. Unzip and run the `laser-laser-laser` executable inside — the
 folder contains everything needed (Python runtime, the Helios library,
-starter patterns), no install step.
+starter patterns), no install step. Each zip has a `README.txt` beside the
+executable with these first-run steps for its OS (the sources are
+`docs/release/README-*.txt`).
 
 A few things to know:
 - **Unsigned binaries**: none of these are code-signed, so Windows
@@ -20,14 +22,18 @@ A few things to know:
   → "Open" (or `xattr -d com.apple.quarantine laser-laser-laser` in
   Terminal) — plain double-clicking a Gatekeeper-blocked file just fails
   silently otherwise.
-- **Linux needs `libusb-1.0-0` installed** (`sudo apt install
-  libusb-1.0-0` if it isn't already — most desktops have it). To let the
-  app open the DAC without root, run `./install-udev.sh` once from the
-  unzipped folder (it asks for your password). Without it the DAC is
+- **Linux with a Helios DAC: run `./install-udev.sh` once per
+  computer.** Open a terminal in the unzipped folder and run it; it asks
+  for your password, installs the USB permission rule and applies it to a
+  DAC that is already plugged in (no replug). Without it the DAC is
   plugged in but Settings can't open it; since 1.12.3 the app says so and
-  names the script. PortAudio (audio input) is
-  bundled since 1.12.2; the 1.12.0 binary crashes on start-up without it,
-  so on that release run `sudo apt install libportaudio2` first.
+  names the script. If it says "Permission denied" (the zip was unpacked
+  somewhere that drops the executable bit), run `sh install-udev.sh`.
+- **Linux needs `libusb-1.0-0` installed** (`sudo apt install
+  libusb-1.0-0` if it isn't already — most desktops have it). PortAudio
+  (audio input) is bundled since 1.12.2; the 1.12.0 binary crashes on
+  start-up without it, so on that release run `sudo apt install
+  libportaudio2` first.
 - **macOS build is Apple Silicon (arm64) only.** Older Intel Macs aren't
   covered by the current workflow.
 - These are the same source files as this repo at that tag — nothing

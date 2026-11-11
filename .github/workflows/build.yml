@@ -118,6 +118,10 @@ jobs:
         shell: bash
         run: ls -l dist/laser-laser-laser/_internal/libportaudio.so*
 
+      - name: Check README.txt is bundled
+        shell: bash
+        run: test -s dist/laser-laser-laser/README.txt
+
       - name: Check udev installer is bundled (Linux)
         if: matrix.os == 'ubuntu-latest'
         shell: bash
@@ -164,3 +168,11 @@ jobs:
         with:
           files: artifacts/*.zip
           generate_release_notes: true
+          # Shown above the generated notes, on the page people download
+          # from. Keep it in step with docs/release/README-*.txt.
+          body: |
+            **Unzip and read `README.txt` in the folder first.**
+
+            - **Linux + Helios DAC:** once per computer, open a terminal in the unzipped folder and run `./install-udev.sh` (it asks for your password). Without it the app sees the DAC but can't open it.
+            - **Windows / macOS:** the apps aren't code-signed. Windows: "More info" → "Run anyway". macOS: right-click → "Open".
+            - Output starts **disarmed** at a 5% brightness ceiling. Nothing is emitted until you ARM.

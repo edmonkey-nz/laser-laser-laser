@@ -19,6 +19,7 @@ running (see build.yml for exactly what goes there per OS). On Linux the
 repo's own libHeliosDacAPI.so is used directly — no staging needed.
 """
 import os
+import shutil
 import sys
 
 datas = [
@@ -72,6 +73,12 @@ coll = COLLECT(
     name="laser-laser-laser",
 )
 
+# README.txt goes at the TOP level of every zip, beside the executable, so
+# it is the first thing a user sees: one per OS, from docs/release/.
+_readme = {"win32": "windows", "darwin": "macos"}.get(sys.platform, "linux")
+shutil.copy(f"docs/release/README-{_readme}.txt",
+            os.path.join(DISTPATH, "laser-laser-laser", "README.txt"))
+
 # The Linux udev rule and its installer have to sit at the TOP level of the
 # unzipped folder, not in _internal/ where `datas` would put them — a user
 # is told to run `./install-udev.sh` from the folder they just unzipped (the
@@ -80,6 +87,5 @@ coll = COLLECT(
 # than as a CI step so a local `pyinstaller pyinstaller.spec` produces the
 # same folder.
 if sys.platform not in ("win32", "darwin"):
-    import shutil
     for f in ("scripts/heliosdac.rules", "scripts/install-udev.sh"):
         shutil.copy(f, os.path.join(DISTPATH, "laser-laser-laser"))

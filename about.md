@@ -1,5 +1,5 @@
 # Laser! Laser Laser!
-v1.12.3
+v1.12.4
 A realtime laser visuals synthesizer for the Helios DAC and the LaserCube.
 
 Created using Claude.AI, but with a human in the loop orchestrating features, bugs and UX.

@@ -1,6 +1,6 @@
 # Laser! Laser Laser!
 
-![version](https://img.shields.io/badge/version-1.12.3-blueviolet)
+![version](https://img.shields.io/badge/version-1.12.4-blueviolet)
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![platform](https://img.shields.io/badge/platform-Ubuntu%20%7C%20Windows%20%7C%20macOS-informational)
 ![ai-code](https://img.shields.io/badge/AI%20coded-YES-orange)
@@ -56,8 +56,11 @@ checklist.
 
 Don't want to set up Python? Grab a zip from the
 [Releases page](https://github.com/edmonkey-nz/laser-laser-laser/releases)
-— Ubuntu, Windows and macOS (Apple Silicon), no install step. See
-[INSTALL.md](docs/INSTALL.md) for the details and per-platform notes.
+— Ubuntu, Windows and macOS (Apple Silicon), no install step. Each zip has
+a `README.txt` with the first-run steps. **On Linux with a Helios DAC, run
+`./install-udev.sh` once** from the unzipped folder so the app may open
+the DAC. See [INSTALL.md](docs/INSTALL.md) for the details and
+per-platform notes.
 
 From source:
 
@@ -100,7 +103,7 @@ Python over the network, so it needs neither.
 
 ## Version
 
-Current release: **1.12.3** (see `CHANGELOG.md`). Run `python laserx3.py
+Current release: **1.12.4** (see `CHANGELOG.md`). Run `python laserx3.py
 --version` to check the installed version.
 
 ## License
