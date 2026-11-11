@@ -3,6 +3,26 @@
 All notable changes to this project are documented here. This project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.12.3] — 2026-11-11
+
+### Added
+
+- **`install-udev.sh` in the Linux zip** (and `scripts/`). One command
+  installs the Helios udev rule and applies it to a DAC that is already
+  plugged in, so there is no replug step to miss.
+
+### Changed
+
+- **The udev rule grants the desktop user access (`TAG+="uaccess"`).**
+  A fresh install no longer needs `plugdev` membership and a re-login;
+  `plugdev` is still granted for SSH and headless use. The rule no longer
+  matches only `ACTION=="add"`, so `udevadm trigger` can apply it.
+- **"Helios DAC not found" now says which problem it is.** On Linux the
+  app checks the USB bus itself (sysfs, opening nothing) and reports
+  either no DAC on USB, a DAC this user can't open (naming the
+  `install-udev.sh` path to run), or a DAC another program is holding.
+  It no longer suggests running with sudo.
+
 ## [1.12.2] — 2026-11-11
 
 ### Fixed

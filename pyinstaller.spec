@@ -72,12 +72,14 @@ coll = COLLECT(
     name="laser-laser-laser",
 )
 
-# The Linux udev rule has to sit at the TOP level of the unzipped folder,
-# not in _internal/ where `datas` would put it — a user is told to run
-# `sudo cp heliosdac.rules ...` from the folder they just unzipped, so it
-# has to be the first thing they see. Done here rather than as a CI step so
-# a local `pyinstaller pyinstaller.spec` produces the same folder.
+# The Linux udev rule and its installer have to sit at the TOP level of the
+# unzipped folder, not in _internal/ where `datas` would put them — a user
+# is told to run `./install-udev.sh` from the folder they just unzipped (the
+# app's own error message names that path), and the script expects the rule
+# beside it. shutil.copy keeps the script's executable bit. Done here rather
+# than as a CI step so a local `pyinstaller pyinstaller.spec` produces the
+# same folder.
 if sys.platform not in ("win32", "darwin"):
     import shutil
-    shutil.copy("scripts/heliosdac.rules",
-                os.path.join(DISTPATH, "laser-laser-laser"))
+    for f in ("scripts/heliosdac.rules", "scripts/install-udev.sh"):
+        shutil.copy(f, os.path.join(DISTPATH, "laser-laser-laser"))

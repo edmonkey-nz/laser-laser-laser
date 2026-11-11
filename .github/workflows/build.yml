@@ -118,7 +118,15 @@ jobs:
         shell: bash
         run: ls -l dist/laser-laser-laser/_internal/libportaudio.so*
 
-      # (the Linux udev rule is bundled by pyinstaller.spec, so local and CI
+      - name: Check udev installer is bundled (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          set -eux
+          test -f dist/laser-laser-laser/heliosdac.rules
+          test -x dist/laser-laser-laser/install-udev.sh
+
+      # (the Linux udev rule and installer are bundled by pyinstaller.spec, so local and CI
       # builds produce the same folder — no copy step needed here)
 
       - name: Package (Linux/macOS)

@@ -1,1 +1,6 @@
-ACTION=="add", SUBSYSTEM=="usb", ATTRS{idVendor}=="1209", ATTRS{idProduct}=="e500", MODE="0660", GROUP="plugdev"
+# Helios laser DAC (USB 1209:e500): non-root access.
+# TAG+="uaccess" gives whoever is logged in at the desktop access, with no
+# group membership or re-login needed. GROUP="plugdev" covers SSH and
+# headless use. No ACTION match, so `udevadm trigger` applies it to a DAC
+# that is already plugged in. Install with install-udev.sh.
+SUBSYSTEM=="usb", ATTRS{idVendor}=="1209", ATTRS{idProduct}=="e500", MODE="0660", GROUP="plugdev", TAG+="uaccess"

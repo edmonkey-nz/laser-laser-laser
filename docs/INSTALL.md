@@ -21,9 +21,11 @@ A few things to know:
   Terminal) — plain double-clicking a Gatekeeper-blocked file just fails
   silently otherwise.
 - **Linux needs `libusb-1.0-0` installed** (`sudo apt install
-  libusb-1.0-0` if it isn't already — most desktops have it). The Ubuntu
-  udev rule (`heliosdac.rules`) is included in the zip; see *Ubuntu
-  setup* below for how to install it. PortAudio (audio input) is
+  libusb-1.0-0` if it isn't already — most desktops have it). To let the
+  app open the DAC without root, run `./install-udev.sh` once from the
+  unzipped folder (it asks for your password). Without it the DAC is
+  plugged in but Settings can't open it; since 1.12.3 the app says so and
+  names the script. PortAudio (audio input) is
   bundled since 1.12.2; the 1.12.0 binary crashes on start-up without it,
   so on that release run `sudo apt install libportaudio2` first.
 - **macOS build is Apple Silicon (arm64) only.** Older Intel Macs aren't
@@ -68,13 +70,14 @@ Once the venv exists you don't have to activate it every time —
 a launcher script.
 
 ```bash
-# USB permissions (once):
-sudo cp scripts/heliosdac.rules /etc/udev/rules.d/011_heliosdac.rules
-sudo udevadm control --reload
-sudo usermod -aG plugdev $USER   # then log out/in
+# USB permissions (once; asks for your password):
+scripts/install-udev.sh
 ```
 
-Replug the DAC after installing the rule.
+The rule gives whoever is logged in at the desktop access to the DAC, and
+applies straight away to a DAC that is already plugged in: no replug, no
+group change, no re-login. For SSH or headless use it also grants the
+`plugdev` group (`sudo usermod -aG plugdev $USER`, then log out and in).
 
 ### Rebuilding libHeliosDacAPI.so (if the prebuilt one doesn't load)
 

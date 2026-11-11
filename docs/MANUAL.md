@@ -734,5 +734,5 @@ live in `docs/` and `scripts/`.
   [INSTALL.md](INSTALL.md#prebuilt-executables))
 - `docs/` — this manual, `INSTALL.md`, third-party licences, and the
   interface snapshot / app icon
-- `scripts/` — `heliosdac.rules` (udev rule for non-root USB access) and
-  `build_helios_lib.sh`
+- `scripts/` — `heliosdac.rules` (udev rule for non-root USB access),
+  `install-udev.sh` (installs it) and `build_helios_lib.sh`

@@ -26,7 +26,7 @@ Default MIDI CC map (channel-agnostic):
   Notes from C1 (36) upward select shapes.
 """
 
-__version__ = "1.12.2"
+__version__ = "1.12.3"
 
 import argparse
 import sys
@@ -348,6 +348,57 @@ class MidiInput:
     def close(self):
         if self.port:
             self.port.close()
+
+
+HELIOS_USB_ID = ("1209", "e500")
+
+
+def helios_usb_hint(sysfs="/sys/bus/usb/devices", devroot="/dev/bus/usb"):
+    """Say why the Helios library found no DAC, on Linux; None elsewhere.
+
+    The library reports 0 devices both when nothing is plugged in and when
+    a DAC is plugged in but this user may not open it, and the second is
+    the usual fresh-install problem: the udev rule isn't installed. sysfs
+    lists USB devices whatever their permissions, so the two can be told
+    apart without opening anything.
+    """
+    if not sys.platform.startswith("linux"):
+        return None
+    import glob
+    import os
+
+    def read(path):
+        try:
+            with open(path) as f:
+                return f.read().strip()
+        except OSError:
+            return None
+
+    nodes = []
+    for d in glob.glob(os.path.join(sysfs, "*")):
+        if (read(os.path.join(d, "idVendor")),
+                read(os.path.join(d, "idProduct"))) != HELIOS_USB_ID:
+            continue
+        bus, dev = read(os.path.join(d, "busnum")), read(os.path.join(d, "devnum"))
+        if bus and dev and bus.isdigit() and dev.isdigit():
+            nodes.append(os.path.join(devroot, f"{int(bus):03d}",
+                                      f"{int(dev):03d}"))
+    if not nodes:
+        return ("no Helios DAC on USB (nothing at 1209:e500) — "
+                "check the cable, the port and the DAC's power")
+    if not any(os.access(n, os.R_OK | os.W_OK) for n in nodes):
+        if getattr(sys, "frozen", False):
+            script = os.path.join(os.path.dirname(sys.executable),
+                                  "install-udev.sh")
+        else:
+            script = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                  "scripts", "install-udev.sh")
+        return ("Helios DAC is on USB but this user can't open it: the udev "
+                f"rule isn't installed. Run {script} once (it asks for your "
+                "password), then select Helios again")
+    return ("Helios DAC is on USB and accessible, but the library couldn't "
+            "open it — is another program, or another copy of this app, "
+            "using it?")
 
 
 def _bundled_portaudio_fallback():
@@ -920,7 +971,15 @@ def main():
     def make_backend(kind):
         if kind == "helios":
             from helios import HeliosOutput
-            b = HeliosOutput(0)
+            try:
+                b = HeliosOutput(0)
+            except RuntimeError as e:
+                # "0 device(s) detected" covers three different fixes;
+                # say which one applies.
+                hint = helios_usb_hint()
+                if hint:
+                    raise RuntimeError(hint) from e
+                raise
             print(f"[laser] Helios DAC ready ({b.num_devices} device(s))")
             return b
         if kind == "lasercube":
