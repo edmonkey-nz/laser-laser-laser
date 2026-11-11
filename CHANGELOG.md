@@ -20,8 +20,10 @@ adheres to [Semantic Versioning](https://semver.org/).
 - **"Helios DAC not found" now says which problem it is.** On Linux the
   app checks the USB bus itself (sysfs, opening nothing) and reports
   either no DAC on USB, a DAC this user can't open (naming the
-  `install-udev.sh` path to run), or a DAC another program is holding.
-  It no longer suggests running with sudo.
+  `install-udev.sh` path to run, or `plugdev` when the rule is already
+  installed), a DAC another program is holding, or no USB device node at
+  all (a container or sandbox). On Linux this app no longer suggests
+  running with sudo; `helios.py`'s own message is unchanged.
 
 ## [1.12.2] — 2026-11-11
 
